@@ -14,7 +14,7 @@ func TestLoadBundledBlock(t *testing.T) {
 }
 
 func TestLoadBundledAllFonts(t *testing.T) {
-	names := []string{"block", "outline", "round", "thin", "3d", "chrome"}
+	names := []string{"block", "slant", "shadow", "doom", "small", "big", "thin", "3d", "script", "lean", "calvin", "banner"}
 	for _, name := range names {
 		f, err := Load(name)
 		if err != nil {

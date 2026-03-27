@@ -12,17 +12,23 @@ import (
 var fontFS embed.FS
 
 var bundledNames = map[string]string{
-	"block":   "data/block.flf",
-	"outline": "data/outline.flf",
-	"round":   "data/round.flf",
-	"thin":    "data/thin.flf",
-	"3d":      "data/3d.flf",
-	"chrome":  "data/chrome.flf",
+	"block":  "data/block.flf",
+	"slant":  "data/slant.flf",
+	"shadow": "data/shadow.flf",
+	"doom":   "data/doom.flf",
+	"small":  "data/small.flf",
+	"big":    "data/big.flf",
+	"thin":   "data/thin.flf",
+	"3d":     "data/3d.flf",
+	"script": "data/script.flf",
+	"lean":   "data/lean.flf",
+	"calvin": "data/calvin.flf",
+	"banner": "data/banner.flf",
 }
 
 // BundledFontNames returns all available bundled font names.
 func BundledFontNames() []string {
-	return []string{"block", "outline", "round", "thin", "3d", "chrome"}
+	return []string{"block", "slant", "shadow", "doom", "small", "big", "thin", "3d", "script", "lean", "calvin", "banner"}
 }
 
 // Load returns a Font by name (bundled) or by file path.
