@@ -158,3 +158,52 @@ func TestRain(t *testing.T) {
 		t.Errorf("rain should be empty in pipe, got %q", r)
 	}
 }
+
+func TestStatusDone(t *testing.T) {
+	r := RenderLine("::status done Build complete", 80, true)
+	if !strings.Contains(r, "✓") || !strings.Contains(r, "Build complete") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestStatusRunning(t *testing.T) {
+	r := RenderLine("::status running Compiling", 80, true)
+	if !strings.Contains(r, "⠹") || !strings.Contains(r, "Compiling") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestStatusError(t *testing.T) {
+	r := RenderLine("::status error Failed", 80, true)
+	if !strings.Contains(r, "✗") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestStatusPending(t *testing.T) {
+	r := RenderLine("::status pending Waiting", 80, true)
+	if !strings.Contains(r, "○") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestSpin(t *testing.T) {
+	r := RenderLine("::spin Deploying", 80, true)
+	if !strings.Contains(r, "⠹") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestProgressAlias(t *testing.T) {
+	r := RenderLine("::progress 75 Coverage", 40, true)
+	if !strings.Contains(r, "75%") {
+		t.Errorf("got %q", r)
+	}
+}
+
+func TestRemoveDirective(t *testing.T) {
+	r := RenderLine("::remove", 80, true)
+	if r != "" {
+		t.Errorf("remove should be empty, got %q", r)
+	}
+}
