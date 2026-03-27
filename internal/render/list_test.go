@@ -25,3 +25,16 @@ func TestRenderListStatus(t *testing.T) {
 func TestRenderListEmpty(t *testing.T) {
 	if RenderList([]string{}, "bullet", false) != "" { t.Error("empty should return empty") }
 }
+func TestRenderListStatusWithColons(t *testing.T) {
+	items := []string{"Suites: 12/12:done", "Coverage: 87%:done", "Auth: login:fail"}
+	result := RenderList(items, "bullet", true)
+	if !strings.Contains(result, "✓") {
+		t.Error("should show ✓ for done items")
+	}
+	if !strings.Contains(result, "Suites: 12/12") {
+		t.Error("text before last colon should be preserved")
+	}
+	if !strings.Contains(result, "✗") {
+		t.Error("should show ✗ for fail items")
+	}
+}

@@ -17,9 +17,12 @@ func RenderList(items []string, style string, statusMode bool) string {
 	var lines []string
 	for i, item := range items {
 		if statusMode {
-			parts := strings.SplitN(item, ":", 2)
-			text, status := parts[0], ""
-			if len(parts) == 2 { status = parts[1] }
+			lastColon := strings.LastIndex(item, ":")
+			text, status := item, ""
+			if lastColon != -1 {
+				text = item[:lastColon]
+				status = item[lastColon+1:]
+			}
 			icon := "•"
 			if ic, ok := statusIcons[status]; ok { icon = ic }
 			lines = append(lines, fmt.Sprintf("%s %s", icon, text))
