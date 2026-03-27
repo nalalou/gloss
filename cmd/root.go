@@ -86,6 +86,12 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load font: %w", err)
 	}
 
+	// Animated gradient cycling
+	if opts.Animate && envInfo.IsTTY && !envInfo.CI && len(opts.Gradient) >= 2 && !opts.NoColor {
+		fontLines := f.Render(text)
+		return animateGradient(fontLines, opts.Gradient)
+	}
+
 	output := render.Render(text, f, opts)
 
 	if opts.Animate && envInfo.IsTTY && !envInfo.CI {

@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/nalalou/gloss/internal/render"
 )
 
 const (
@@ -63,6 +65,53 @@ func animate(text string) error {
 		}
 	}
 	fmt.Println()
+	return nil
+}
+
+// animateGradient cycles gradient colors across the rendered text.
+// Runs for 90 frames (~3s at 33ms/frame), then shows final static frame.
+func animateGradient(fontLines []string, gradientHexes []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	fmt.Fprint(os.Stdout, hideCursor)
+	defer fmt.Fprint(os.Stdout, showCursor)
+
+	const (
+		frames  = 90
+		frameMs = 33
+	)
+
+	numLines := len(fontLines)
+
+	for frame := 0; frame < frames; frame++ {
+		select {
+		case <-ctx.Done():
+			fmt.Println()
+			return nil
+		default:
+		}
+
+		offset := float64(frame) / float64(frames)
+		colored := render.RenderGradientFrame(fontLines, gradientHexes, offset)
+
+		if frame > 0 {
+			fmt.Fprintf(os.Stdout, "\033[%dA", numLines)
+		}
+		for _, line := range colored {
+			fmt.Fprintf(os.Stdout, "\033[2K%s\n", line)
+		}
+
+		time.Sleep(frameMs * time.Millisecond)
+	}
+
+	// Final static frame
+	fmt.Fprintf(os.Stdout, "\033[%dA", numLines)
+	colored := render.RenderGradientFrame(fontLines, gradientHexes, 0)
+	for _, line := range colored {
+		fmt.Fprintf(os.Stdout, "\033[2K%s\n", line)
+	}
+
 	return nil
 }
 

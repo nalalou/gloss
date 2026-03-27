@@ -187,6 +187,14 @@ func ColorizeLines(lines []string, gradient []string, color string, noColor bool
 	return lines
 }
 
+func RenderGradientFrame(lines []string, gradientHexes []string, offset float64) []string {
+	colors, err := ParseGradientColors(gradientHexes)
+	if err != nil {
+		return lines
+	}
+	return ApplyGradientWithOffset(lines, colors, "horizontal", offset, false)
+}
+
 func ApplySolidColor(lines []string, hex string, noColor bool) []string {
 	if noColor || hex == "" {
 		return lines
