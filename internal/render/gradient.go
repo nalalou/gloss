@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -28,32 +29,80 @@ func interpolate(a, b rgbColor, t float64) rgbColor {
 	return rgbColor{lerp(a.R, b.R), lerp(a.G, b.G), lerp(a.B, b.B)}
 }
 
+func interpolateMulti(colors []rgbColor, t float64) rgbColor {
+	if len(colors) == 0 {
+		return rgbColor{}
+	}
+	if len(colors) == 1 {
+		return colors[0]
+	}
+	t = math.Max(0, math.Min(1, t))
+	n := len(colors) - 1
+	segment := t * float64(n)
+	idx := int(segment)
+	if idx >= n {
+		return colors[n]
+	}
+	localT := segment - float64(idx)
+	return interpolate(colors[idx], colors[idx+1], localT)
+}
+
 func ansiColor(c rgbColor, s string) string {
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", c.R, c.G, c.B, s)
 }
 
-var gradientPresets = map[string][2]string{
-	"fire":   {"#FF4500", "#FFD700"},
-	"ocean":  {"#006994", "#00CED1"},
-	"mono":   {"#FFFFFF", "#888888"},
-	"neon":   {"#FF6B9D", "#C0F0A0"},
-	"aurora": {"#00FA9A", "#9370DB"},
+var gradientPresets = map[string][]string{
+	"fire":      {"#FF4500", "#FFD700"},
+	"ocean":     {"#006994", "#00CED1"},
+	"mono":      {"#FFFFFF", "#888888"},
+	"neon":      {"#FF6B9D", "#C0F0A0"},
+	"aurora":    {"#00FA9A", "#9370DB"},
+	"sunset":    {"#FF6B35", "#F7931E", "#FF355E"},
+	"synthwave": {"#FF00FF", "#00FFFF", "#FF00FF"},
+	"matrix":    {"#00FF00", "#003300"},
+	"cyberpunk": {"#FFFF00", "#FF00FF"},
+	"pastel":    {"#FFB3BA", "#BAE1FF"},
+	"lavender":  {"#9B59B6", "#3498DB"},
+	"ice":       {"#FFFFFF", "#00BFFF", "#0000FF"},
+	"autumn":    {"#8B4513", "#FF8C00", "#FFD700"},
+	"mint":      {"#00FF7F", "#20B2AA"},
+	"rainbow":   {"#FF0000", "#FF8800", "#FFFF00", "#00FF00", "#0088FF", "#8800FF"},
 }
 
-// GradientPreset returns the start and end colors for a named preset.
-func GradientPreset(name string) (start, end rgbColor, ok bool) {
-	pair, ok := gradientPresets[name]
+func GradientPresetNames() []string {
+	return []string{"fire", "ocean", "mono", "neon", "aurora", "sunset", "synthwave", "matrix", "cyberpunk", "pastel", "lavender", "ice", "autumn", "mint", "rainbow"}
+}
+
+func GradientPreset(name string) ([]rgbColor, bool) {
+	hexes, ok := gradientPresets[name]
 	if !ok {
-		return rgbColor{}, rgbColor{}, false
+		return nil, false
 	}
-	s, _ := parseHex(pair[0])
-	e, _ := parseHex(pair[1])
-	return s, e, true
+	colors := make([]rgbColor, len(hexes))
+	for i, h := range hexes {
+		c, err := parseHex(h)
+		if err != nil {
+			return nil, false
+		}
+		colors[i] = c
+	}
+	return colors, true
 }
 
-// ApplyGradient colors lines with a gradient from start to end.
-func ApplyGradient(lines []string, start, end rgbColor, direction string, noColor bool) []string {
-	if noColor {
+func ParseGradientColors(hexes []string) ([]rgbColor, error) {
+	colors := make([]rgbColor, len(hexes))
+	for i, h := range hexes {
+		c, err := parseHex(h)
+		if err != nil {
+			return nil, fmt.Errorf("gradient color %d: %w", i+1, err)
+		}
+		colors[i] = c
+	}
+	return colors, nil
+}
+
+func ApplyGradient(lines []string, colors []rgbColor, direction string, noColor bool) []string {
+	if noColor || len(colors) == 0 {
 		return lines
 	}
 	result := make([]string, len(lines))
@@ -64,12 +113,11 @@ func ApplyGradient(lines []string, start, end rgbColor, direction string, noColo
 			if len(lines) > 1 {
 				t = float64(i) / float64(len(lines)-1)
 			}
-			result[i] = ansiColor(interpolate(start, end, t), line)
+			result[i] = ansiColor(interpolateMulti(colors, t), line)
 		}
 		return result
 	}
 
-	// Horizontal: color each rune individually
 	for i, line := range lines {
 		runes := []rune(line)
 		n := len(runes)
@@ -79,7 +127,7 @@ func ApplyGradient(lines []string, start, end rgbColor, direction string, noColo
 			if n > 1 {
 				t = float64(j) / float64(n-1)
 			}
-			c := interpolate(start, end, t)
+			c := interpolateMulti(colors, t)
 			sb.WriteString(ansiColor(c, string(ch)))
 		}
 		result[i] = sb.String()
@@ -87,7 +135,58 @@ func ApplyGradient(lines []string, start, end rgbColor, direction string, noColo
 	return result
 }
 
-// ApplySolidColor colors all lines with a single hex color.
+func ApplyGradientWithOffset(lines []string, colors []rgbColor, direction string, offset float64, noColor bool) []string {
+	if noColor || len(colors) == 0 {
+		return lines
+	}
+	result := make([]string, len(lines))
+
+	if direction == "vertical" {
+		for i, line := range lines {
+			t := 0.0
+			if len(lines) > 1 {
+				t = float64(i) / float64(len(lines)-1)
+			}
+			t = math.Mod(t+offset, 1.0)
+			result[i] = ansiColor(interpolateMulti(colors, t), line)
+		}
+		return result
+	}
+
+	for i, line := range lines {
+		runes := []rune(line)
+		n := len(runes)
+		var sb strings.Builder
+		for j, ch := range runes {
+			t := 0.0
+			if n > 1 {
+				t = float64(j) / float64(n-1)
+			}
+			t = math.Mod(t+offset, 1.0)
+			c := interpolateMulti(colors, t)
+			sb.WriteString(ansiColor(c, string(ch)))
+		}
+		result[i] = sb.String()
+	}
+	return result
+}
+
+func ColorizeLines(lines []string, gradient []string, color string, noColor bool) []string {
+	if noColor {
+		return lines
+	}
+	if len(gradient) >= 2 {
+		colors, err := ParseGradientColors(gradient)
+		if err == nil {
+			return ApplyGradient(lines, colors, "horizontal", false)
+		}
+	}
+	if color != "" {
+		return ApplySolidColor(lines, color, false)
+	}
+	return lines
+}
+
 func ApplySolidColor(lines []string, hex string, noColor bool) []string {
 	if noColor || hex == "" {
 		return lines

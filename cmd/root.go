@@ -46,7 +46,7 @@ func init() {
 	rootCmd.SilenceErrors = true
 	rootCmd.SilenceUsage = true
 	rootCmd.PersistentFlags().StringVar(&flagFont, "font", "", "font name or path to .flf file (default: block)")
-	rootCmd.PersistentFlags().StringVar(&flagGradient, "gradient", "", `gradient colors "#hex1,#hex2" or preset name (fire, ocean, mono, neon, aurora)`)
+	rootCmd.PersistentFlags().StringVar(&flagGradient, "gradient", "", `gradient preset or hex colors "#hex1,#hex2[,#hex3...]"`)
 	rootCmd.PersistentFlags().StringVar(&flagColor, "color", "", "solid text color as hex (#RRGGBB)")
 	rootCmd.PersistentFlags().BoolVar(&flagShadow, "shadow", false, "add drop shadow")
 	rootCmd.PersistentFlags().StringVar(&flagAlign, "align", "", "text alignment: left, center, right")
@@ -114,10 +114,11 @@ func validateFlags() error {
 		return fmt.Errorf("invalid --width %d; must be non-negative", flagWidth)
 	}
 	if flagGradient != "" {
-		if _, _, ok := render.GradientPreset(flagGradient); !ok {
+		if _, ok := render.GradientPreset(flagGradient); !ok {
 			parts := strings.Split(flagGradient, ",")
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid --gradient %q; use a preset name (fire, ocean, mono, neon, aurora) or two hex colors: \"#hex1,#hex2\"", flagGradient)
+			if len(parts) < 2 {
+				names := strings.Join(render.GradientPresetNames(), ", ")
+				return fmt.Errorf("invalid --gradient %q; use a preset name (%s) or 2+ hex colors: \"#hex1,#hex2[,#hex3...]\"", flagGradient, names)
 			}
 		}
 	}
@@ -147,6 +148,28 @@ func resolveText(args []string) (string, error) {
 	return "", nil
 }
 
+func resolveGradientFlag() []string {
+	if flagGradient == "" {
+		return nil
+	}
+	if colors, ok := render.GradientPreset(flagGradient); ok {
+		hexes := make([]string, len(colors))
+		for i, c := range colors {
+			hexes[i] = fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B)
+		}
+		return hexes
+	}
+	parts := strings.Split(flagGradient, ",")
+	if len(parts) >= 2 {
+		trimmed := make([]string, len(parts))
+		for i, p := range parts {
+			trimmed[i] = strings.TrimSpace(p)
+		}
+		return trimmed
+	}
+	return nil
+}
+
 func flagsToOptions() theme.Options {
 	opts := theme.Options{}
 	opts.Font = flagFont
@@ -157,21 +180,7 @@ func flagsToOptions() theme.Options {
 	opts.Animate = flagAnimate
 	opts.Width = flagWidth
 	opts.NoColor = flagNoColor
-
-	if flagGradient != "" {
-		if start, end, ok := render.GradientPreset(flagGradient); ok {
-			opts.Gradient = []string{
-				fmt.Sprintf("#%02X%02X%02X", start.R, start.G, start.B),
-				fmt.Sprintf("#%02X%02X%02X", end.R, end.G, end.B),
-			}
-		} else {
-			parts := strings.Split(flagGradient, ",")
-			if len(parts) == 2 {
-				opts.Gradient = []string{strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])}
-			}
-		}
-	}
-
+	opts.Gradient = resolveGradientFlag()
 	return opts
 }
 
