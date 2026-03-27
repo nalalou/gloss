@@ -1,0 +1,44 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - binary: gloss
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+brews:
+  - name: gloss
+    homepage: "https://github.com/nalalou/gloss"
+    description: "Render beautiful styled text banners in your terminal"
+    license: "MIT"
+    repository:
+      owner: nalalou
+      name: homebrew-gloss
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    test: |
+      system "#{bin}/gloss --help"
+    install: |
+      bin.install "gloss"
