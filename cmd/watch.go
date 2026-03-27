@@ -116,9 +116,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 			if len(scrollLines) > 0 || panelChanged {
 				renderer.WriteScrollWithPanel(scrollLines, panelLines, prevPanelHeight)
-				if newPanelHeight > 0 && (len(scrollLines) > 0 || prevPanelHeight == 0) {
-					fmt.Fprint(os.Stdout, "\n")
-				}
 			}
 			prevPanelHeight = newPanelHeight
 

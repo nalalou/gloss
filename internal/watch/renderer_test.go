@@ -31,8 +31,8 @@ func TestRenderPanelRedraw(t *testing.T) {
 	buf.Reset()
 	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build"}, 2)
 	out := buf.String()
-	if !strings.Contains(out, "\033[2A") {
-		t.Error("expected cursor-up for redraw")
+	if !strings.Contains(out, "\033[1A") {
+		t.Error("expected cursor-up(1) for 2-line panel redraw")
 	}
 }
 
@@ -69,7 +69,7 @@ func TestClearPanel(t *testing.T) {
 	r := NewRenderer(&buf, 60, false)
 	r.ClearPanel(3)
 	out := buf.String()
-	if !strings.Contains(out, "\033[3A") {
-		t.Error("expected cursor-up in clear")
+	if !strings.Contains(out, "\033[2A") {
+		t.Error("expected cursor-up(2) for 3-line clear")
 	}
 }
