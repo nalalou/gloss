@@ -1,123 +1,173 @@
 package watch
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"strings"
+	"unicode/utf8"
 )
 
 const (
-	hideCursorSeq = "\033[?25l"
-	showCursorSeq = "\033[?25h"
-	clearLineSeq  = "\033[2K"
-	syncBegin     = "\033[?2026h"
-	syncEnd       = "\033[?2026l"
+	escCursorUp1  = "\033[1A"
+	escCursorDn1  = "\033[1B"
+	escCursorCol0 = "\033[0G"
+	escHideCursor = "\033[?25l"
+	escShowCursor = "\033[?25h"
 )
 
-// Renderer handles terminal output with cursor control for the panel.
-//
-// Model: we track how many physical lines the panel currently occupies.
-// To redraw, we move up that many lines, clear them, and write new content.
-// The cursor always ends AFTER the last line we wrote (on a new blank line).
+// Renderer uses the Docker BuildKit pattern with single-syscall buffered writes.
 type Renderer struct {
 	out           io.Writer
 	width         int
 	noColor       bool
-	linesOnScreen int // how many lines we've written that we need to erase on next redraw
+	linesOnScreen int
+	repeated      bool
 }
 
 func NewRenderer(out io.Writer, width int, noColor bool) *Renderer {
 	return &Renderer{out: out, width: width, noColor: noColor}
 }
 
-func (r *Renderer) HideCursor() { fmt.Fprint(r.out, hideCursorSeq) }
-func (r *Renderer) ShowCursor() { fmt.Fprint(r.out, showCursorSeq) }
+func (r *Renderer) HideCursor() { fmt.Fprint(r.out, escHideCursor) }
+func (r *Renderer) ShowCursor() { fmt.Fprint(r.out, escShowCursor) }
 
-// WriteScroll prints a line that scrolls normally (no panel).
 func (r *Renderer) WriteScroll(line string) {
 	fmt.Fprintf(r.out, "%s\n", line)
 }
 
-// Render does a full redraw cycle:
-// 1. Erase the previous panel (move up, clear each line)
-// 2. Print scroll lines (these become permanent scroll output)
-// 3. Print new panel lines
-//
-// After this call, linesOnScreen reflects the new panel height.
 func (r *Renderer) Render(scrollLines []string, panelLines []string) {
-	// If nothing to do and no previous panel, just print scroll lines
-	if r.linesOnScreen == 0 && len(panelLines) == 0 {
+	if r.linesOnScreen == 0 && len(panelLines) == 0 && !r.repeated {
 		for _, line := range scrollLines {
 			fmt.Fprintf(r.out, "%s\n", line)
 		}
 		return
 	}
 
-	fmt.Fprint(r.out, syncBegin)
+	var buf bytes.Buffer
 
-	// Step 1: Move up to erase the old panel
-	if r.linesOnScreen > 0 {
-		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
-		for i := 0; i < r.linesOnScreen; i++ {
-			fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
-		}
-		// Move back to where we started erasing
-		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	buf.WriteString(escHideCursor)
+	writeUpN(&buf, r.linesOnScreen)
+
+	if !r.repeated && len(panelLines) > 0 {
+		buf.WriteString(escCursorDn1)
+		writeUpN(&buf, 1)
 	}
 
-	// Step 2: Print scroll lines (permanent, won't be erased next time)
 	for _, line := range scrollLines {
-		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
+		writePadded(&buf, line, r.width)
+	}
+	for _, line := range panelLines {
+		writePadded(&buf, line, r.width)
 	}
 
-	// Step 3: Print new panel lines
-	for _, line := range panelLines {
-		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
+	written := len(scrollLines) + len(panelLines)
+	if leftover := r.linesOnScreen - written; leftover > 0 {
+		for i := 0; i < leftover; i++ {
+			writePadded(&buf, "", r.width)
+		}
+		writeUpN(&buf, leftover)
 	}
 
 	r.linesOnScreen = len(panelLines)
+	if len(panelLines) > 0 {
+		r.repeated = true
+	}
+	buf.WriteString(escShowCursor)
 
-	fmt.Fprint(r.out, syncEnd)
+	r.out.Write(buf.Bytes()) // single syscall
 }
 
-// DrawPanel redraws only the panel (no scroll content). Used for spinner ticks.
 func (r *Renderer) DrawPanel(panelLines []string) {
 	if len(panelLines) == 0 && r.linesOnScreen == 0 {
 		return
 	}
 
-	fmt.Fprint(r.out, syncBegin)
+	var buf bytes.Buffer
 
-	// Erase old panel
-	if r.linesOnScreen > 0 {
-		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
-		for i := 0; i < r.linesOnScreen; i++ {
-			fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
-		}
-		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	buf.WriteString(escHideCursor)
+	writeUpN(&buf, r.linesOnScreen)
+
+	if !r.repeated && len(panelLines) > 0 {
+		buf.WriteString(escCursorDn1)
+		writeUpN(&buf, 1)
 	}
 
-	// Write new panel
 	for _, line := range panelLines {
-		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
+		writePadded(&buf, line, r.width)
+	}
+
+	if leftover := r.linesOnScreen - len(panelLines); leftover > 0 {
+		for i := 0; i < leftover; i++ {
+			writePadded(&buf, "", r.width)
+		}
+		writeUpN(&buf, leftover)
 	}
 
 	r.linesOnScreen = len(panelLines)
+	if len(panelLines) > 0 {
+		r.repeated = true
+	}
+	buf.WriteString(escShowCursor)
 
-	fmt.Fprint(r.out, syncEnd)
+	r.out.Write(buf.Bytes()) // single syscall
 }
 
-// ClearPanel erases the panel. Used at cleanup/exit.
 func (r *Renderer) ClearPanel() {
 	if r.linesOnScreen == 0 {
 		return
 	}
-	fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	var buf bytes.Buffer
+	buf.WriteString(escHideCursor)
+	writeUpN(&buf, r.linesOnScreen)
 	for i := 0; i < r.linesOnScreen; i++ {
-		fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
+		writePadded(&buf, "", r.width)
 	}
-	fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	writeUpN(&buf, r.linesOnScreen)
 	r.linesOnScreen = 0
+	r.repeated = false
+	buf.WriteString(escShowCursor)
+	r.out.Write(buf.Bytes())
 }
 
-func (r *Renderer) SetWidth(width int)  { r.width = width }
-func (r *Renderer) LinesOnScreen() int  { return r.linesOnScreen }
+func (r *Renderer) SetWidth(width int) { r.width = width }
+func (r *Renderer) LinesOnScreen() int { return r.linesOnScreen }
+
+func writeUpN(buf *bytes.Buffer, n int) {
+	for i := 0; i < n; i++ {
+		buf.WriteString(escCursorUp1)
+	}
+}
+
+func writePadded(buf *bytes.Buffer, line string, width int) {
+	vis := visibleLen(line)
+	pad := width - vis
+	if pad < 0 {
+		pad = 0
+	}
+	buf.WriteString(escCursorCol0)
+	buf.WriteString(line)
+	buf.WriteString(strings.Repeat(" ", pad))
+	buf.WriteByte('\n')
+}
+
+func visibleLen(s string) int {
+	n := 0
+	i := 0
+	for i < len(s) {
+		if s[i] == '\033' && i+1 < len(s) && s[i+1] == '[' {
+			i += 2
+			for i < len(s) && s[i] >= 0x20 && s[i] <= 0x3F {
+				i++
+			}
+			if i < len(s) {
+				i++
+			}
+			continue
+		}
+		_, size := utf8.DecodeRuneInString(s[i:])
+		i += size
+		n++
+	}
+	return n
+}
