@@ -17,7 +17,8 @@ const (
 
 func padLine(content string, width int) string {
 	vis := len(content) // test lines have no ANSI
-	pad := width - vis
+	maxCols := width - 1
+	pad := maxCols - vis
 	if pad < 0 {
 		pad = 0
 	}

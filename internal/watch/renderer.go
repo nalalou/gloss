@@ -141,7 +141,8 @@ func writeUpN(buf *bytes.Buffer, n int) {
 
 func writePadded(buf *bytes.Buffer, line string, width int) {
 	vis := visibleLen(line)
-	pad := width - vis
+	maxCols := width - 1 // never fill last column — avoids Terminal.app pending-wrap double advance
+	pad := maxCols - vis
 	if pad < 0 {
 		pad = 0
 	}
