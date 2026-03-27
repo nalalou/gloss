@@ -52,6 +52,14 @@ func RenderLine(line string, width int, noColor bool) string {
 		return fmtSpark(args)
 	case "color":
 		return fmtColor(args, noColor)
+	case "status":
+		return fmtStatus(args, noColor)
+	case "progress":
+		return fmtBar(args, width)
+	case "remove":
+		return ""
+	case "spin":
+		return fmtStatus("running "+args, noColor)
 	case "rain":
 		return ""
 	default:
@@ -210,6 +218,45 @@ func termWidth() int {
 		return 80
 	}
 	return w
+}
+
+func fmtStatus(args string, noColor bool) string {
+	parts := strings.SplitN(strings.TrimSpace(args), " ", 2)
+	if len(parts) < 2 {
+		return args
+	}
+	state := parts[0]
+	text := parts[1]
+
+	var icon string
+	switch state {
+	case "done":
+		icon = "✓"
+	case "error":
+		icon = "✗"
+	case "pending":
+		icon = "○"
+	case "running":
+		icon = "⠹"
+	default:
+		return args
+	}
+
+	result := icon + " " + text
+	if noColor {
+		return result
+	}
+
+	switch state {
+	case "done":
+		return render.RenderStyled(result, "#00FF00", false, false)
+	case "error":
+		return render.RenderStyled(result, "#FF0000", false, false)
+	case "pending":
+		return render.RenderStyled(result, "#888888", false, true)
+	default:
+		return result
+	}
 }
 
 // Needed so render package functions used here are importable
