@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	clr     = "\033[2K"
-	syncOn  = "\033[?2026h"
-	syncOff = "\033[?2026l"
+	tclr     = "\033[2K"
+	tsyncOn  = "\033[?2026h"
+	tsyncOff = "\033[?2026l"
 )
 
-func upN(n int) string {
+func tup(n int) string {
 	s := "\033["
 	if n >= 10 {
 		s += string(rune('0'+n/10)) + string(rune('0'+n%10))
@@ -21,168 +21,109 @@ func upN(n int) string {
 	return s + "A"
 }
 
-// Scenario 1: First panel render, no previous panel.
-// Cursor starts at a blank line. No cursor-up needed.
-// Cursor ends ON last panel line (no trailing \n).
-func TestExact_FirstPanelRender(t *testing.T) {
+// New model: cursor ends AFTER the last panel line (every line has \n).
+// To erase: move up N, clear N lines, move up N again.
+// Then write new content.
+
+func TestExact_FirstPanel(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, false)
+	r.DrawPanel([]string{"div", "status"})
 
-	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build", "  ✓ Test"}, 0)
-
-	expected := syncOn +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ✓ Build" + "\n" +
-		"\r" + clr + "  ✓ Test" +
-		syncOff
+	// No previous panel → no erase. Just write 2 lines.
+	expected := tsyncOn +
+		"\r" + tclr + "div\n" +
+		"\r" + tclr + "status\n" +
+		tsyncOff
 
 	if got := buf.String(); got != expected {
 		t.Errorf("first panel:\nexpected: %q\n     got: %q", expected, got)
 	}
-}
-
-// Scenario 2: Panel-only update, same size.
-// Cursor is ON last panel line. up(prevHeight-1) to reach first line.
-func TestExact_PanelOnlyUpdate(t *testing.T) {
-	var buf bytes.Buffer
-	r := NewRenderer(&buf, 80, false)
-
-	r.DrawPanel([]string{"─── gloss ───", "  ⠙ Build", "  ✓ Test"}, 3)
-
-	expected := syncOn +
-		upN(2) +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ⠙ Build" + "\n" +
-		"\r" + clr + "  ✓ Test" +
-		syncOff
-
-	if got := buf.String(); got != expected {
-		t.Errorf("panel update:\nexpected: %q\n     got: %q", expected, got)
+	if r.LinesOnScreen() != 2 {
+		t.Errorf("linesOnScreen: %d", r.LinesOnScreen())
 	}
 }
 
-// Scenario 3: Scroll lines + panel redraw.
-// Cursor ON last panel line. up(prevHeight-1) to first panel line.
-// Scroll lines overwrite old panel lines, panel redraws below.
+func TestExact_PanelRedraw(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, false)
+
+	// First draw
+	r.DrawPanel([]string{"div", "old"})
+	buf.Reset()
+
+	// Redraw (same size)
+	r.DrawPanel([]string{"div", "new"})
+
+	// Erase old 2 lines: up(2), clear+\n x2, up(2). Then write new 2 lines.
+	expected := tsyncOn +
+		tup(2) +
+		"\r" + tclr + "\n" +
+		"\r" + tclr + "\n" +
+		tup(2) +
+		"\r" + tclr + "div\n" +
+		"\r" + tclr + "new\n" +
+		tsyncOff
+
+	if got := buf.String(); got != expected {
+		t.Errorf("panel redraw:\nexpected: %q\n     got: %q", expected, got)
+	}
+}
+
 func TestExact_ScrollWithPanel(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, false)
 
-	r.WriteScrollWithPanel(
-		[]string{"output 1", "output 2"},
-		[]string{"─── gloss ───", "  ✓ Build", "  ✓ Test"},
-		3,
-	)
+	// Establish a 2-line panel
+	r.DrawPanel([]string{"div", "status"})
+	buf.Reset()
 
-	expected := syncOn +
-		upN(2) +
-		"\r" + clr + "output 1" + "\n" +
-		"\r" + clr + "output 2" + "\n" +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ✓ Build" + "\n" +
-		"\r" + clr + "  ✓ Test" +
-		syncOff
+	// Scroll lines + panel redraw
+	r.Render([]string{"output1"}, []string{"div", "status2"})
+
+	// Erase old 2: up(2), clear x2, up(2). Print scroll. Print panel.
+	expected := tsyncOn +
+		tup(2) +
+		"\r" + tclr + "\n" +
+		"\r" + tclr + "\n" +
+		tup(2) +
+		"\r" + tclr + "output1\n" +
+		"\r" + tclr + "div\n" +
+		"\r" + tclr + "status2\n" +
+		tsyncOff
 
 	if got := buf.String(); got != expected {
 		t.Errorf("scroll+panel:\nexpected: %q\n     got: %q", expected, got)
 	}
 }
 
-// Scenario 4: Panel grows (3 → 4).
-// up(2) to first line, write 4 lines. Extra line scrolls terminal.
-func TestExact_PanelGrows(t *testing.T) {
-	var buf bytes.Buffer
-	r := NewRenderer(&buf, 80, false)
-
-	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build", "  ✓ Test", "  ✓ Deploy"}, 3)
-
-	expected := syncOn +
-		upN(2) +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ✓ Build" + "\n" +
-		"\r" + clr + "  ✓ Test" + "\n" +
-		"\r" + clr + "  ✓ Deploy" +
-		syncOff
-
-	if got := buf.String(); got != expected {
-		t.Errorf("panel grows:\nexpected: %q\n     got: %q", expected, got)
-	}
-}
-
-// Scenario 5: Panel shrinks (4 → 3).
-// up(3) to first line, write 3 lines, clear orphan line, move back.
-func TestExact_PanelShrinks(t *testing.T) {
-	var buf bytes.Buffer
-	r := NewRenderer(&buf, 80, false)
-
-	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build", "  ✓ Test"}, 4)
-
-	expected := syncOn +
-		upN(3) +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ✓ Build" + "\n" +
-		"\r" + clr + "  ✓ Test" + "\n" +
-		"\r" + clr +
-		upN(1) +
-		syncOff
-
-	if got := buf.String(); got != expected {
-		t.Errorf("panel shrinks:\nexpected: %q\n     got: %q", expected, got)
-	}
-}
-
-// Scenario 6: Pure scroll, no panel at all.
 func TestExact_ScrollNoPanel(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, false)
-
-	r.WriteScrollWithPanel([]string{"hello", "world"}, nil, 0)
-
+	r.Render([]string{"hello", "world"}, nil)
 	expected := "hello\nworld\n"
-
 	if got := buf.String(); got != expected {
 		t.Errorf("scroll no panel:\nexpected: %q\n     got: %q", expected, got)
 	}
 }
 
-// Scenario 7: Panel appears mid-stream (prevPanelHeight=0, panel lines present).
-func TestExact_PanelAppearsMidStream(t *testing.T) {
-	var buf bytes.Buffer
-	r := NewRenderer(&buf, 80, false)
-
-	r.WriteScrollWithPanel(
-		[]string{"compiling main.go"},
-		[]string{"─── gloss ───", "  ⠋ Build", "  ○ Test"},
-		0,
-	)
-
-	expected := syncOn +
-		"\r" + clr + "compiling main.go" + "\n" +
-		"\r" + clr + "─── gloss ───" + "\n" +
-		"\r" + clr + "  ⠋ Build" + "\n" +
-		"\r" + clr + "  ○ Test" +
-		syncOff
-
-	if got := buf.String(); got != expected {
-		t.Errorf("panel mid-stream:\nexpected: %q\n     got: %q", expected, got)
-	}
-}
-
-// Scenario 8: ClearPanel.
-// Cursor ON last panel line. up(height-1) to first, clear all, up(height) back.
 func TestExact_ClearPanel(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, false)
+	r.DrawPanel([]string{"a", "b", "c"})
+	buf.Reset()
+	r.ClearPanel()
 
-	r.ClearPanel(3)
-
-	expected := upN(2) +
-		"\r" + clr + "\n" +
-		"\r" + clr + "\n" +
-		"\r" + clr + "\n" +
-		upN(3)
+	expected := tup(3) +
+		"\r" + tclr + "\n" +
+		"\r" + tclr + "\n" +
+		"\r" + tclr + "\n" +
+		tup(3)
 
 	if got := buf.String(); got != expected {
-		t.Errorf("clear panel:\nexpected: %q\n     got: %q", expected, got)
+		t.Errorf("clear:\nexpected: %q\n     got: %q", expected, got)
+	}
+	if r.LinesOnScreen() != 0 {
+		t.Errorf("linesOnScreen after clear: %d", r.LinesOnScreen())
 	}
 }

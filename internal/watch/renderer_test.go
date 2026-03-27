@@ -9,7 +9,7 @@ import (
 func TestRenderPanelToBuffer(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 60, false)
-	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build"}, 0)
+	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build"})
 	if !strings.Contains(buf.String(), "gloss") {
 		t.Errorf("missing panel: %q", buf.String())
 	}
@@ -27,12 +27,13 @@ func TestRenderScrollLine(t *testing.T) {
 func TestRenderPanelRedraw(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 60, false)
-	r.DrawPanel([]string{"─── gloss ───", "  ○ Build"}, 0)
+	r.DrawPanel([]string{"─── gloss ───", "  ○ Build"})
 	buf.Reset()
-	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build"}, 2)
+	r.DrawPanel([]string{"─── gloss ───", "  ✓ Build"})
 	out := buf.String()
-	if !strings.Contains(out, "\033[1A") {
-		t.Error("expected cursor-up(1) for 2-line panel redraw")
+	// Should move up 2 lines to erase old panel
+	if !strings.Contains(out, "\033[2A") {
+		t.Error("expected cursor-up(2) for 2-line panel redraw")
 	}
 }
 
@@ -54,22 +55,25 @@ func TestRenderShowCursor(t *testing.T) {
 	}
 }
 
-func TestWriteScrollWithPanelNoPanel(t *testing.T) {
+func TestRenderScrollNoPanel(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 60, false)
-	r.WriteScrollWithPanel([]string{"line1", "line2"}, nil, 0)
+	r.Render([]string{"line1", "line2"}, nil)
 	out := buf.String()
 	if !strings.Contains(out, "line1") || !strings.Contains(out, "line2") {
 		t.Errorf("missing scroll lines: %q", out)
 	}
 }
 
-func TestClearPanel(t *testing.T) {
+func TestClearPanelFunc(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 60, false)
-	r.ClearPanel(3)
+	// First draw a panel
+	r.DrawPanel([]string{"a", "b", "c"})
+	buf.Reset()
+	r.ClearPanel()
 	out := buf.String()
-	if !strings.Contains(out, "\033[2A") {
-		t.Error("expected cursor-up(2) for 3-line clear")
+	if !strings.Contains(out, "\033[3A") {
+		t.Error("expected cursor-up(3) for 3-line clear")
 	}
 }

@@ -15,13 +15,14 @@ const (
 
 // Renderer handles terminal output with cursor control for the panel.
 //
-// Cursor invariant: after every render call, the cursor is ON the last
-// panel line (no trailing newline). If there's no panel, cursor is at
-// the start of a new line after the last scroll output.
+// Model: we track how many physical lines the panel currently occupies.
+// To redraw, we move up that many lines, clear them, and write new content.
+// The cursor always ends AFTER the last line we wrote (on a new blank line).
 type Renderer struct {
-	out     io.Writer
-	width   int
-	noColor bool
+	out           io.Writer
+	width         int
+	noColor       bool
+	linesOnScreen int // how many lines we've written that we need to erase on next redraw
 }
 
 func NewRenderer(out io.Writer, width int, noColor bool) *Renderer {
@@ -36,12 +37,15 @@ func (r *Renderer) WriteScroll(line string) {
 	fmt.Fprintf(r.out, "%s\n", line)
 }
 
-// WriteScrollWithPanel prints scroll content then redraws the panel.
-// prevPanelHeight is the number of lines the panel occupied last time.
-// Cursor must be ON the last panel line (or at a fresh line if prevPanelHeight=0).
-func (r *Renderer) WriteScrollWithPanel(scrollLines []string, panelLines []string, prevPanelHeight int) {
-	// No panel at all — just print scroll lines
-	if prevPanelHeight == 0 && len(panelLines) == 0 {
+// Render does a full redraw cycle:
+// 1. Erase the previous panel (move up, clear each line)
+// 2. Print scroll lines (these become permanent scroll output)
+// 3. Print new panel lines
+//
+// After this call, linesOnScreen reflects the new panel height.
+func (r *Renderer) Render(scrollLines []string, panelLines []string) {
+	// If nothing to do and no previous panel, just print scroll lines
+	if r.linesOnScreen == 0 && len(panelLines) == 0 {
 		for _, line := range scrollLines {
 			fmt.Fprintf(r.out, "%s\n", line)
 		}
@@ -50,100 +54,70 @@ func (r *Renderer) WriteScrollWithPanel(scrollLines []string, panelLines []strin
 
 	fmt.Fprint(r.out, syncBegin)
 
-	// Move cursor to the FIRST line of the old panel.
-	// Cursor is ON the last panel line, so up (prevHeight - 1) reaches first.
-	if prevPanelHeight > 1 {
-		fmt.Fprintf(r.out, "\033[%dA", prevPanelHeight-1)
+	// Step 1: Move up to erase the old panel
+	if r.linesOnScreen > 0 {
+		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+		for i := 0; i < r.linesOnScreen; i++ {
+			fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
+		}
+		// Move back to where we started erasing
+		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
 	}
 
-	// Write scroll lines (overwriting old panel lines, pushing content up).
+	// Step 2: Print scroll lines (permanent, won't be erased next time)
 	for _, line := range scrollLines {
 		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
 	}
 
-	// Write panel lines. Last line has NO trailing \n.
-	for i, line := range panelLines {
-		if i < len(panelLines)-1 {
-			fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
-		} else {
-			fmt.Fprintf(r.out, "\r%s%s", clearLineSeq, line)
-		}
+	// Step 3: Print new panel lines
+	for _, line := range panelLines {
+		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
 	}
 
-	// Clear orphaned lines if panel shrank or was removed.
-	totalWritten := len(scrollLines) + len(panelLines)
-	if totalWritten < prevPanelHeight {
-		orphans := prevPanelHeight - totalWritten
-		if len(panelLines) == 0 {
-			// Cursor is already on the first orphan line (after last scroll \n).
-			// Clear it, then clear remaining orphans below.
-			fmt.Fprintf(r.out, "\r%s", clearLineSeq)
-			for i := 1; i < orphans; i++ {
-				fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
-			}
-			fmt.Fprintf(r.out, "\033[%dA", orphans)
-		} else {
-			// Cursor is ON the last panel line (no trailing \n).
-			for i := 0; i < orphans; i++ {
-				fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
-			}
-			fmt.Fprintf(r.out, "\033[%dA", orphans)
-		}
-	}
+	r.linesOnScreen = len(panelLines)
 
 	fmt.Fprint(r.out, syncEnd)
 }
 
-// DrawPanel redraws the panel in place.
-// prevHeight is the number of lines the panel occupied last time.
-func (r *Renderer) DrawPanel(lines []string, prevHeight int) {
-	if len(lines) == 0 {
+// DrawPanel redraws only the panel (no scroll content). Used for spinner ticks.
+func (r *Renderer) DrawPanel(panelLines []string) {
+	if len(panelLines) == 0 && r.linesOnScreen == 0 {
 		return
 	}
 
 	fmt.Fprint(r.out, syncBegin)
 
-	// Move to first panel line. Cursor is ON last line, so up (prev - 1).
-	if prevHeight > 1 {
-		fmt.Fprintf(r.out, "\033[%dA", prevHeight-1)
+	// Erase old panel
+	if r.linesOnScreen > 0 {
+		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+		for i := 0; i < r.linesOnScreen; i++ {
+			fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
+		}
+		fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
 	}
 
-	// Write all panel lines. Last line has no trailing \n.
-	for i, line := range lines {
-		if i < len(lines)-1 {
-			fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
-		} else {
-			fmt.Fprintf(r.out, "\r%s%s", clearLineSeq, line)
-		}
+	// Write new panel
+	for _, line := range panelLines {
+		fmt.Fprintf(r.out, "\r%s%s\n", clearLineSeq, line)
 	}
 
-	// Clear orphaned lines if panel shrank.
-	if len(lines) < prevHeight {
-		orphans := prevHeight - len(lines)
-		for i := 0; i < orphans; i++ {
-			fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
-		}
-		fmt.Fprintf(r.out, "\033[%dA", orphans)
-	}
+	r.linesOnScreen = len(panelLines)
 
 	fmt.Fprint(r.out, syncEnd)
 }
 
-// ClearPanel erases the panel area and repositions cursor to where the panel started.
-func (r *Renderer) ClearPanel(height int) {
-	if height == 0 {
+// ClearPanel erases the panel. Used at cleanup/exit.
+func (r *Renderer) ClearPanel() {
+	if r.linesOnScreen == 0 {
 		return
 	}
-	// Move to first panel line
-	if height > 1 {
-		fmt.Fprintf(r.out, "\033[%dA", height-1)
-	}
-	// Clear each line
-	for i := 0; i < height; i++ {
+	fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	for i := 0; i < r.linesOnScreen; i++ {
 		fmt.Fprintf(r.out, "\r%s\n", clearLineSeq)
 	}
-	// Move back up to where panel started
-	fmt.Fprintf(r.out, "\033[%dA", height)
+	fmt.Fprintf(r.out, "\033[%dA", r.linesOnScreen)
+	r.linesOnScreen = 0
 }
 
-func (r *Renderer) SetWidth(width int) { r.width = width }
+func (r *Renderer) SetWidth(width int)  { r.width = width }
+func (r *Renderer) LinesOnScreen() int  { return r.linesOnScreen }

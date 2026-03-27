@@ -71,7 +71,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	spinnerTicker := time.NewTicker(80 * time.Millisecond)
 	defer spinnerTicker.Stop()
 	spinnerFrame := 0
-	prevPanelHeight := 0
 
 	for {
 		select {
@@ -95,42 +94,28 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			}
 
 			var scrollLines []string
-			panelChanged := false
-
 			for _, bline := range batch {
 				dir, id, dargs := protocol.ParseDirective(bline)
 
 				if dir == "remove" && id != "" {
 					panel.Remove(id)
-					panelChanged = true
 				} else if dir != "" && id != "" {
 					panel.Set(id, dir, dargs, noColor)
-					panelChanged = true
 				} else {
 					rendered := protocol.RenderLine(bline, width, noColor)
-					// Split multi-line rendered content (callouts, tables)
-					// into separate scroll lines for correct cursor tracking
 					for _, subline := range strings.Split(rendered, "\n") {
 						scrollLines = append(scrollLines, subline)
 					}
 				}
 			}
 
-			panelLines := panel.RenderLines()
-			newPanelHeight := len(panelLines)
-
-			if len(scrollLines) > 0 || panelChanged {
-				renderer.WriteScrollWithPanel(scrollLines, panelLines, prevPanelHeight)
-			}
-			prevPanelHeight = newPanelHeight
+			renderer.Render(scrollLines, panel.RenderLines())
 
 		case <-spinnerTicker.C:
 			if panel.HasRunning() {
 				spinnerFrame++
 				panel.UpdateSpinnerFrame(spinnerFrame, noColor)
-				panelLines := panel.RenderLines()
-				renderer.DrawPanel(panelLines, prevPanelHeight)
-				prevPanelHeight = len(panelLines)
+				renderer.DrawPanel(panel.RenderLines())
 			}
 
 		case sig := <-sigCh:
@@ -149,9 +134,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	}
 
 cleanup:
-	if prevPanelHeight > 0 {
-		renderer.ClearPanel(prevPanelHeight)
-	}
+	renderer.ClearPanel()
 	summaryLines := panel.RenderLines()
 	for _, line := range summaryLines {
 		fmt.Println(line)
