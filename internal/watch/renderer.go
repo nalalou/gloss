@@ -70,17 +70,25 @@ func (r *Renderer) WriteScrollWithPanel(scrollLines []string, panelLines []strin
 		}
 	}
 
-	// Clear orphaned lines if panel shrank.
-	// After writing, cursor is on the new last panel line.
-	// Old panel had more lines below — they still have stale content.
+	// Clear orphaned lines if panel shrank or was removed.
 	totalWritten := len(scrollLines) + len(panelLines)
 	if totalWritten < prevPanelHeight {
 		orphans := prevPanelHeight - totalWritten
-		for i := 0; i < orphans; i++ {
-			fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
+		if len(panelLines) == 0 {
+			// Cursor is already on the first orphan line (after last scroll \n).
+			// Clear it, then clear remaining orphans below.
+			fmt.Fprintf(r.out, "\r%s", clearLineSeq)
+			for i := 1; i < orphans; i++ {
+				fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
+			}
+			fmt.Fprintf(r.out, "\033[%dA", orphans)
+		} else {
+			// Cursor is ON the last panel line (no trailing \n).
+			for i := 0; i < orphans; i++ {
+				fmt.Fprintf(r.out, "\n\r%s", clearLineSeq)
+			}
+			fmt.Fprintf(r.out, "\033[%dA", orphans)
 		}
-		// Move back up to the actual last panel line
-		fmt.Fprintf(r.out, "\033[%dA", orphans)
 	}
 
 	fmt.Fprint(r.out, syncEnd)

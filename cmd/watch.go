@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -107,7 +108,11 @@ func runWatch(cmd *cobra.Command, args []string) error {
 					panelChanged = true
 				} else {
 					rendered := protocol.RenderLine(bline, width, noColor)
-					scrollLines = append(scrollLines, rendered)
+					// Split multi-line rendered content (callouts, tables)
+					// into separate scroll lines for correct cursor tracking
+					for _, subline := range strings.Split(rendered, "\n") {
+						scrollLines = append(scrollLines, subline)
+					}
 				}
 			}
 

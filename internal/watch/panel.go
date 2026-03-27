@@ -85,7 +85,7 @@ func (p *Panel) RenderLines() []string {
 		return nil
 	}
 	var lines []string
-	lines = append(lines, render.RenderDivider("gloss", p.width, "light"))
+	lines = append(lines, render.RenderDivider("gloss", p.width-1, "light"))
 	for _, id := range p.order {
 		if elem, ok := p.elements[id]; ok {
 			for _, line := range strings.Split(elem.Rendered, "\n") {
