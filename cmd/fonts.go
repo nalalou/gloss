@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nalalou/gloss/internal/env"
 	"github.com/nalalou/gloss/internal/font"
 	"github.com/nalalou/gloss/internal/render"
 	"github.com/nalalou/gloss/internal/theme"
@@ -22,6 +23,7 @@ func init() {
 }
 
 func runFonts(cmd *cobra.Command, args []string) error {
+	envInfo := env.Detect()
 	names := font.BundledFontNames()
 	previewText := "Gloss"
 
@@ -38,8 +40,10 @@ func runFonts(cmd *cobra.Command, args []string) error {
 		fmt.Println(header)
 
 		opts := theme.Defaults()
-		opts.Gradient = []string{"#FF6B9D", "#6B9DFF"}
 		opts.Align = "left"
+		if envInfo.NoColor || flagNoColor {
+			opts.NoColor = true
+		}
 
 		output := render.Render(previewText, f, opts)
 		fmt.Println(output)

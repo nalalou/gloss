@@ -80,7 +80,7 @@ func ParseFLF(r io.Reader) (*FLFFont, error) {
 func (f *FLFFont) Height() int { return f.height }
 
 func (f *FLFFont) Render(text string) []string {
-	rows := make([]string, f.height)
+	builders := make([]strings.Builder, f.height)
 
 	for _, ch := range text {
 		charLines, ok := f.chars[ch]
@@ -89,10 +89,14 @@ func (f *FLFFont) Render(text string) []string {
 		}
 		for i := 0; i < f.height; i++ {
 			if i < len(charLines) {
-				rows[i] += charLines[i]
+				builders[i].WriteString(charLines[i])
 			}
 		}
 	}
 
+	rows := make([]string, f.height)
+	for i := range builders {
+		rows[i] = builders[i].String()
+	}
 	return rows
 }

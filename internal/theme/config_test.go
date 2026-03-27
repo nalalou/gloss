@@ -14,8 +14,11 @@ func TestDefaults(t *testing.T) {
 	if opts.Align != "left" {
 		t.Errorf("expected align=left, got %q", opts.Align)
 	}
-	if opts.Border != "none" {
-		t.Errorf("expected border=none, got %q", opts.Border)
+	if opts.Border != "rounded" {
+		t.Errorf("expected border=rounded, got %q", opts.Border)
+	}
+	if len(opts.Gradient) != 2 || opts.Gradient[0] != "#FF6B9D" || opts.Gradient[1] != "#6B9DFF" {
+		t.Errorf("expected gradient=[#FF6B9D #6B9DFF], got %v", opts.Gradient)
 	}
 	if opts.Shadow {
 		t.Error("expected shadow=false by default")
@@ -48,8 +51,8 @@ align = "center"
 		t.Errorf("expected align=center, got %q", opts.Align)
 	}
 	// Unset keys should keep defaults
-	if opts.Border != "none" {
-		t.Errorf("expected border=none (default), got %q", opts.Border)
+	if opts.Border != "rounded" {
+		t.Errorf("expected border=rounded (default), got %q", opts.Border)
 	}
 }
 
@@ -66,8 +69,8 @@ func TestMerge(t *testing.T) {
 	if merged.Align != "right" {
 		t.Errorf("expected align=right after merge, got %q", merged.Align)
 	}
-	if merged.Border != "none" {
-		t.Errorf("expected border=none from base, got %q", merged.Border)
+	if merged.Border != "rounded" {
+		t.Errorf("expected border=rounded from base, got %q", merged.Border)
 	}
 }
 

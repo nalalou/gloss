@@ -15,7 +15,7 @@ const glossTomlTemplate = `# gloss.toml — theme configuration for gloss
 # gradient = ["#FF6B9D", "#6B9DFF"]
 # shadow = false
 # align = "left"
-# border = "none"
+# border = "rounded"
 # animate = false
 `
 

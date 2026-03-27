@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var (
 	flagFont     string
 	flagGradient string
@@ -26,14 +28,23 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gloss [text]",
-	Short: "Render beautiful styled text banners",
-	Long:  `gloss renders text as styled ASCII art banners. Reads gloss.toml if present.`,
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runRoot,
+	Use:     "gloss [text]",
+	Short:   "Render beautiful styled text banners",
+	Long:    `gloss renders text as styled ASCII art banners. Reads gloss.toml if present.`,
+	Version: version,
+	Example: `  gloss "Hello World"
+  gloss "Deploy v2.0" --gradient=fire --border=rounded --shadow
+  echo "OK" | gloss --font=outline
+  gloss "Title" --color="#FF5500" --align=center
+  gloss fonts                         # preview all bundled fonts
+  gloss init                          # scaffold a gloss.toml`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runRoot,
 }
 
 func init() {
+	rootCmd.SilenceErrors = true
+	rootCmd.SilenceUsage = true
 	rootCmd.PersistentFlags().StringVar(&flagFont, "font", "", "font name or path to .flf file (default: block)")
 	rootCmd.PersistentFlags().StringVar(&flagGradient, "gradient", "", `gradient colors "#hex1,#hex2" or preset name (fire, ocean, mono, neon, aurora)`)
 	rootCmd.PersistentFlags().StringVar(&flagColor, "color", "", "solid text color as hex (#RRGGBB)")
@@ -51,7 +62,10 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
-		return cmd.Usage()
+		return fmt.Errorf("no text provided; run 'gloss --help' for usage")
+	}
+	if err := validateFlags(); err != nil {
+		return err
 	}
 
 	envInfo := env.Detect()
@@ -81,15 +95,52 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func validateFlags() error {
+	if flagAlign != "" {
+		switch flagAlign {
+		case "left", "center", "right":
+		default:
+			return fmt.Errorf("invalid --align %q; expected: left, center, right", flagAlign)
+		}
+	}
+	if flagBorder != "" {
+		switch flagBorder {
+		case "none", "single", "double", "rounded", "thick":
+		default:
+			return fmt.Errorf("invalid --border %q; expected: none, single, double, rounded, thick", flagBorder)
+		}
+	}
+	if flagWidth < 0 {
+		return fmt.Errorf("invalid --width %d; must be non-negative", flagWidth)
+	}
+	if flagGradient != "" {
+		if _, _, ok := render.GradientPreset(flagGradient); !ok {
+			parts := strings.Split(flagGradient, ",")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid --gradient %q; use a preset name (fire, ocean, mono, neon, aurora) or two hex colors: \"#hex1,#hex2\"", flagGradient)
+			}
+		}
+	}
+	return nil
+}
+
+const maxInputSize = 64 * 1024 // 64KB
+
 func resolveText(args []string) (string, error) {
 	if len(args) > 0 {
 		return args[0], nil
 	}
-	stat, _ := os.Stdin.Stat()
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return "", nil
+	}
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		data, err := io.ReadAll(os.Stdin)
+		data, err := io.ReadAll(io.LimitReader(os.Stdin, maxInputSize+1))
 		if err != nil {
 			return "", fmt.Errorf("read stdin: %w", err)
+		}
+		if len(data) > maxInputSize {
+			return "", fmt.Errorf("input too large (max %dKB); gloss is for short banner text", maxInputSize/1024)
 		}
 		return strings.TrimRight(string(data), "\n"), nil
 	}

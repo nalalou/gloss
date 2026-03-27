@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/muesli/termenv"
+	"golang.org/x/term"
 )
 
 // Info holds detected terminal environment state.
@@ -18,13 +19,15 @@ type Info struct {
 func Detect() Info {
 	noColor := os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 	ci := os.Getenv("CI") == "true"
+	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
 
 	output := termenv.NewOutput(os.Stdout)
 	profile := output.ColorProfile()
-	isTTY := output.HasDarkBackground() || profile != termenv.Ascii
 
-	if noColor {
+	// Auto-disable color when not a TTY (piped output)
+	if !isTTY || noColor {
 		profile = termenv.Ascii
+		noColor = true
 	}
 
 	return Info{

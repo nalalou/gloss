@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -24,9 +25,10 @@ type Options struct {
 // Defaults returns the baseline Options before any config or flags are applied.
 func Defaults() Options {
 	return Options{
-		Font:   "block",
-		Align:  "left",
-		Border: "none",
+		Font:     "block",
+		Gradient: []string{"#FF6B9D", "#6B9DFF"},
+		Align:    "left",
+		Border:   "rounded",
 	}
 }
 
@@ -117,22 +119,28 @@ func Resolve() Options {
 
 func resolveFromDir(dir string) Options {
 	if path := os.Getenv("GLOSS_THEME"); path != "" {
-		if opts, err := LoadFile(path); err == nil {
+		opts, err := LoadFile(path)
+		if err == nil {
 			return opts
 		}
+		fmt.Fprintf(os.Stderr, "gloss: warning: ignoring %s: %v\n", path, err)
 	}
 	projectPath := filepath.Join(dir, "gloss.toml")
 	if _, err := os.Stat(projectPath); err == nil {
-		if opts, err := LoadFile(projectPath); err == nil {
+		opts, err := LoadFile(projectPath)
+		if err == nil {
 			return opts
 		}
+		fmt.Fprintf(os.Stderr, "gloss: warning: ignoring %s: %v\n", projectPath, err)
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		userPath := filepath.Join(home, ".config", "gloss", "gloss.toml")
 		if _, err := os.Stat(userPath); err == nil {
-			if opts, err := LoadFile(userPath); err == nil {
+			opts, err := LoadFile(userPath)
+			if err == nil {
 				return opts
 			}
+			fmt.Fprintf(os.Stderr, "gloss: warning: ignoring %s: %v\n", userPath, err)
 		}
 	}
 	return Defaults()
