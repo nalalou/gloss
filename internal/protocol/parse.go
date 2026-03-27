@@ -101,7 +101,14 @@ func fmtBar(args string, width int) string {
 	if width == 0 {
 		width = termWidth()
 	}
-	result := render.RenderBar(val, width, "blocks", true)
+	barWidth := width
+	if label != "" {
+		barWidth = width - len([]rune(label)) - 1 // reserve space for "label "
+		if barWidth < 10 {
+			barWidth = 10
+		}
+	}
+	result := render.RenderBar(val, barWidth, "blocks", true)
 	if label != "" {
 		result = label + " " + result
 	}
