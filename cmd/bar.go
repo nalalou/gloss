@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -21,6 +20,9 @@ var (
 var barCmd = &cobra.Command{
 	Use:   "bar <value>",
 	Short: "Render a progress bar",
+	Long: `Renders a terminal progress bar. Accepts a percentage (75), a decimal (0.75),
+or a fraction (3/4). Use --label to add a prefix and --style to pick a visual
+style (blocks, dots, ascii, thin).`,
 	Example: `  gloss bar 75
   gloss bar 0.75
   gloss bar 3/4
@@ -42,15 +44,14 @@ func runBar(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		input = args[0]
 	} else {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, 1024))
-			if err != nil { return fmt.Errorf("read stdin: %w", err) }
-			input = strings.TrimSpace(string(data))
+		t, err := readStdinText(int64(maxInputSize))
+		if err != nil {
+			return err
 		}
+		input = strings.TrimSpace(t)
 	}
 	if input == "" {
-		return fmt.Errorf("no value provided; usage: gloss bar <value>")
+		return fmt.Errorf("no value provided; see 'gloss bar --help'")
 	}
 
 	percent, err := render.ParseBarValue(input)
@@ -61,6 +62,14 @@ func runBar(cmd *cobra.Command, args []string) error {
 		w, _, err := term.GetSize(int(os.Stdout.Fd()))
 		if err != nil || w <= 0 { w = 80 }
 		width = w
+	}
+
+	// Subtract label width before rendering so the bar fits in one line.
+	if flagBarLabel != "" {
+		width -= len(flagBarLabel) + 1
+		if width < 10 {
+			width = 10
+		}
 	}
 
 	result := render.RenderBar(percent, width, flagBarStyle, !flagBarNoPercent)

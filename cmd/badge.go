@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/nalalou/gloss/internal/env"
@@ -16,6 +14,9 @@ var flagBadgeType string
 var badgeCmd = &cobra.Command{
 	Use:   "badge <text>",
 	Short: "Render a status badge",
+	Long: `Renders a colored status badge with an icon and label text. Badge types
+(success, error, warning, info, plain) determine the icon and default color.
+Use --gradient or --color to override the default badge color.`,
 	Example: `  gloss badge "Tests passing" --type=success
   gloss badge "Build failed" --type=error`,
 	Args: cobra.MaximumNArgs(1),
@@ -24,6 +25,8 @@ var badgeCmd = &cobra.Command{
 
 func init() {
 	badgeCmd.Flags().StringVar(&flagBadgeType, "type", "plain", "badge type: success, error, warning, info, plain")
+	badgeCmd.Flags().StringVar(&flagBadgeType, "style", "plain", "alias for --type")
+	badgeCmd.Flags().MarkHidden("style")
 	rootCmd.AddCommand(badgeCmd)
 }
 
@@ -32,17 +35,14 @@ func runBadge(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		text = args[0]
 	} else {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, 4096))
-			if err != nil {
-				return fmt.Errorf("read stdin: %w", err)
-			}
-			text = strings.TrimSpace(string(data))
+		t, err := readStdinText(int64(maxInputSize))
+		if err != nil {
+			return err
 		}
+		text = strings.TrimSpace(t)
 	}
 	if text == "" {
-		return fmt.Errorf("no text provided; usage: gloss badge <text> --type=success")
+		return fmt.Errorf("no text provided; see 'gloss badge --help'")
 	}
 
 	validTypes := []string{"success", "error", "warning", "info", "plain"}

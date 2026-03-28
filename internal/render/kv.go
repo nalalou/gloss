@@ -14,8 +14,8 @@ func RenderKV(pairs [][]string, separator string) string {
 	// Find max key width for alignment
 	maxKey := 0
 	for _, pair := range pairs {
-		if len(pair[0]) > maxKey {
-			maxKey = len(pair[0])
+		if displayWidth(pair[0]) > maxKey {
+			maxKey = displayWidth(pair[0])
 		}
 	}
 
@@ -26,8 +26,8 @@ func RenderKV(pairs [][]string, separator string) string {
 		if len(pair) > 1 {
 			val = pair[1]
 		}
-		padding := strings.Repeat(" ", maxKey-len(key))
-		lines = append(lines, fmt.Sprintf("  %s%s %s %s", key, padding, separator, val))
+		padding := strings.Repeat(" ", maxKey-displayWidth(key))
+		lines = append(lines, fmt.Sprintf("%s%s %s %s", key, padding, separator, val))
 	}
 	return strings.Join(lines, "\n")
 }

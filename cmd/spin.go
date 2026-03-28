@@ -9,12 +9,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nalalou/gloss/internal/env"
+	"github.com/nalalou/gloss/internal/render"
 	"github.com/spf13/cobra"
 )
 
 var spinCmd = &cobra.Command{
 	Use:   "spin <message> [-- command args...]",
 	Short: "Show a spinner while a command runs",
+	Long: `Displays an animated spinner with a label while an external command runs.
+If no command is given after --, runs a 2-second demo. The completion badge
+and label text respect --color and --gradient flags.`,
 	Example: `  gloss spin "Installing..." -- npm install
   gloss spin "Building..." -- make build
   gloss spin "Loading..."`,
@@ -48,10 +53,26 @@ func runSpin(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	envInfo := env.Detect()
+	noColor := envInfo.NoColor || flagNoColor
+
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	if flagNoColor {
+	if noColor {
 		frames = []string{".", "..", "...", "....", "....."}
 	}
+
+	// Colorize the label text
+	colorizeLabel := func(s string) string {
+		if noColor {
+			return s
+		}
+		gradient := resolveGradientFlag()
+		color := flagColor
+		lines := render.ColorizeLines([]string{s}, gradient, color, noColor)
+		return lines[0]
+	}
+
+	coloredMessage := colorizeLabel(message)
 
 	// Hide cursor
 	fmt.Fprint(os.Stderr, "\033[?25l")
@@ -86,18 +107,21 @@ func runSpin(cmd *cobra.Command, args []string) error {
 			// Clear spinner line
 			fmt.Fprintf(os.Stderr, "\r\033[2K")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "✗ %s\n", message)
+				badge := colorizeLabel("✗ " + message)
+				fmt.Fprintf(os.Stderr, "%s\n", badge)
 				return fmt.Errorf("command failed: %w", err)
 			}
-			fmt.Fprintf(os.Stderr, "✓ %s\n", message)
+			badge := colorizeLabel("✓ " + message)
+			fmt.Fprintf(os.Stderr, "%s\n", badge)
 			return nil
 		case <-ctx.Done():
 			fmt.Fprintf(os.Stderr, "\r\033[2K")
-			fmt.Fprintf(os.Stderr, "✗ %s (cancelled)\n", message)
+			cancelled := colorizeLabel("✗ " + message + " (cancelled)")
+			fmt.Fprintf(os.Stderr, "%s\n", cancelled)
 			return nil
 		case <-ticker.C:
 			frame := frames[frameIdx%len(frames)]
-			fmt.Fprintf(os.Stderr, "\r\033[2K  %s %s", frame, message)
+			fmt.Fprintf(os.Stderr, "\r\033[2K  %s %s", frame, coloredMessage)
 			frameIdx++
 		}
 	}

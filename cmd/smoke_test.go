@@ -27,6 +27,9 @@ func resetFlags() {
 	flagListStyle = "bullet"
 	flagListStatus = false
 	flagCalloutType = "info"
+	flagColorFg = ""
+	flagColorBold = false
+	flagColorDim = false
 }
 
 func run(args ...string) (string, error) {
@@ -80,9 +83,10 @@ func TestE2EBannerInvalidGradient(t *testing.T) {
 }
 
 func TestE2EBannerEmptyText(t *testing.T) {
+	// Empty text shows the showcase (not an error) per Issue 4
 	_, err := run("")
-	if err == nil {
-		t.Error("expected error for empty text")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -331,4 +335,20 @@ func TestE2EVersionOutput(t *testing.T) {
 	}
 	// version output goes to cobra's writer; may or may not be captured
 	_ = out
+}
+
+// --- Chart ---
+
+func TestE2EChartBasic(t *testing.T) {
+	_, err := run("chart", "10,5,8,3", "--height=4")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestE2EChartEmpty(t *testing.T) {
+	err := runChart(chartCmd, []string{})
+	if err == nil {
+		t.Error("expected error for empty input")
+	}
 }

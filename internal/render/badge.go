@@ -1,10 +1,10 @@
 package render
 
 var badgeTypes = map[string]struct{ Icon, Color string }{
-	"success": {"✓", "#00FF00"},
-	"error":   {"✗", "#FF0000"},
+	"success": {"✓", "#44FF88"},
+	"error":   {"✗", "#FF4444"},
 	"warning": {"⚠", "#FFD700"},
-	"info":    {"ℹ", "#00BFFF"},
+	"info":    {"ℹ", "#4488FF"},
 	"plain":   {"", ""},
 }
 

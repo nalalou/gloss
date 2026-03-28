@@ -47,7 +47,7 @@ func RenderBar(percent float64, width int, style string, showPercent bool) strin
 	label := ""
 	if showPercent {
 		label = fmt.Sprintf(" %.0f%%", percent)
-		barWidth = width - len(label)
+		barWidth = width - displayWidth(label)
 	}
 	if barWidth < 1 { barWidth = 1 }
 	filled := int(math.Round(float64(barWidth) * percent / 100))

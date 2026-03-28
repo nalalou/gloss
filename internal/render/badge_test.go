@@ -38,7 +38,7 @@ func TestRenderBadgePlain(t *testing.T) {
 }
 
 func TestBadgeDefaultColor(t *testing.T) {
-	if BadgeDefaultColor("success") != "#00FF00" {
+	if BadgeDefaultColor("success") != "#44FF88" {
 		t.Error("wrong color")
 	}
 }

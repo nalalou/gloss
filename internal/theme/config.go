@@ -20,6 +20,24 @@ type Options struct {
 	Animate  bool
 	Width    int  // 0 = use terminal width
 	NoColor  bool // force plain text output
+
+	// Changed tracks which fields were explicitly set (not just zero-value).
+	// This allows Merge to distinguish "not set" from "explicitly set to false"
+	// for boolean fields like Shadow and Animate.
+	Changed map[string]bool
+}
+
+// WithChanged marks a field name as explicitly set in the Changed map.
+func (o *Options) SetChanged(field string) {
+	if o.Changed == nil {
+		o.Changed = make(map[string]bool)
+	}
+	o.Changed[field] = true
+}
+
+// IsChanged reports whether a field was explicitly set.
+func (o Options) IsChanged(field string) bool {
+	return o.Changed[field]
 }
 
 // Defaults returns the baseline Options before any config or flags are applied.
@@ -89,8 +107,8 @@ func Merge(base, override Options) Options {
 	if override.Color != "" {
 		base.Color = override.Color
 	}
-	if override.Shadow {
-		base.Shadow = true
+	if override.Shadow || override.IsChanged("Shadow") {
+		base.Shadow = override.Shadow
 	}
 	if override.Align != "" {
 		base.Align = override.Align
@@ -98,8 +116,8 @@ func Merge(base, override Options) Options {
 	if override.Border != "" {
 		base.Border = override.Border
 	}
-	if override.Animate {
-		base.Animate = true
+	if override.Animate || override.IsChanged("Animate") {
+		base.Animate = override.Animate
 	}
 	if override.Width != 0 {
 		base.Width = override.Width

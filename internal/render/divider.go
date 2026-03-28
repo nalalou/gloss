@@ -20,7 +20,7 @@ func RenderDivider(label string, width int, style string) string {
 		return strings.Repeat(ch, width)
 	}
 	padded := " " + label + " "
-	remaining := width - len([]rune(padded))
+	remaining := width - displayWidth(padded)
 	if remaining <= 0 {
 		return padded
 	}

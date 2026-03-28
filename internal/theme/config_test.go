@@ -74,6 +74,60 @@ func TestMerge(t *testing.T) {
 	}
 }
 
+func TestMergeBoolChanged(t *testing.T) {
+	t.Run("shadow true overrides false base", func(t *testing.T) {
+		base := Defaults() // Shadow=false
+		override := Options{Shadow: true}
+		merged := Merge(base, override)
+		if !merged.Shadow {
+			t.Error("expected shadow=true after merge with true override")
+		}
+	})
+
+	t.Run("explicit false overrides true base via Changed", func(t *testing.T) {
+		base := Defaults()
+		base.Shadow = true
+		base.Animate = true
+
+		override := Options{Shadow: false, Animate: false}
+		override.SetChanged("Shadow")
+		override.SetChanged("Animate")
+
+		merged := Merge(base, override)
+		if merged.Shadow {
+			t.Error("expected shadow=false after merge with explicitly changed false")
+		}
+		if merged.Animate {
+			t.Error("expected animate=false after merge with explicitly changed false")
+		}
+	})
+
+	t.Run("unset override preserves base", func(t *testing.T) {
+		base := Defaults()
+		base.Shadow = true
+		override := Options{} // Shadow=false, not in Changed
+		merged := Merge(base, override)
+		if !merged.Shadow {
+			t.Error("expected shadow=true (base preserved when override not changed)")
+		}
+	})
+}
+
+func TestIsChanged(t *testing.T) {
+	opts := Options{}
+	if opts.IsChanged("Shadow") {
+		t.Error("expected IsChanged=false for uninitialized Options")
+	}
+
+	opts.SetChanged("Shadow")
+	if !opts.IsChanged("Shadow") {
+		t.Error("expected IsChanged=true after SetChanged")
+	}
+	if opts.IsChanged("Animate") {
+		t.Error("expected IsChanged=false for field not set")
+	}
+}
+
 func TestResolveNoFile(t *testing.T) {
 	dir := t.TempDir()
 	os.Unsetenv("GLOSS_THEME")

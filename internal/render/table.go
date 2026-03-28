@@ -19,9 +19,39 @@ func RenderTable(rows [][]string, borderStyle string) string {
 	if len(rows) == 0 { return "" }
 	cols := 0
 	for _, row := range rows { if len(row) > cols { cols = len(row) } }
+
+	// Determine available width for wrapping: terminal minus border chrome (4) minus separators
+	tw := termWidth()
+	borderChrome := 0
+	if borderStyle != "none" && borderStyle != "" {
+		borderChrome = 4 // 2 border + 2 padding
+	}
+	separatorWidth := (cols - 1) * 3 // " │ " between columns
+	availForCells := tw - borderChrome - separatorWidth
+	maxCellWidth := 0
+	if cols > 0 && availForCells > 0 {
+		maxCellWidth = availForCells / cols
+	}
+
+	// Wrap cell content if it exceeds max cell width
+	if maxCellWidth > 10 {
+		for r, row := range rows {
+			for c, cell := range row {
+				if displayWidth(cell) > maxCellWidth {
+					rows[r][c] = wrapText(cell, maxCellWidth)
+				}
+			}
+		}
+	}
+
 	widths := make([]int, cols)
 	for _, row := range rows {
-		for i, cell := range row { if len(cell) > widths[i] { widths[i] = len(cell) } }
+		for i, cell := range row {
+			// For wrapped cells, use the widest line
+			for _, line := range strings.Split(cell, "\n") {
+				if displayWidth(line) > widths[i] { widths[i] = displayWidth(line) }
+			}
+		}
 	}
 	var sb strings.Builder
 	for _, row := range rows {
@@ -29,7 +59,7 @@ func RenderTable(rows [][]string, borderStyle string) string {
 		for i := 0; i < cols; i++ {
 			cell := ""
 			if i < len(row) { cell = row[i] }
-			cells = append(cells, cell+strings.Repeat(" ", widths[i]-len(cell)))
+			cells = append(cells, cell+strings.Repeat(" ", widths[i]-displayWidth(cell)))
 		}
 		sb.WriteString(strings.Join(cells, " │ ") + "\n")
 	}

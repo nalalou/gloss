@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/nalalou/gloss/internal/env"
@@ -19,6 +17,9 @@ var (
 var listCmd = &cobra.Command{
 	Use:   "list <items...>",
 	Short: "Render a styled list",
+	Long: `Renders a styled list from arguments or newline-delimited stdin. Supports
+bullet, arrow, dash, star, check, and numbered styles. Use --status to parse
+items as "text:done|pending|fail" for status indicators.`,
 	Example: `  gloss list "Build" "Test" "Deploy"
   gloss list --style=numbered "Step 1" "Step 2"
   gloss list "Build:done" "Test:pending" --status`,
@@ -37,15 +38,18 @@ func runList(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		items = args
 	} else {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, int64(maxInputSize)))
-			if err != nil { return fmt.Errorf("read stdin: %w", err) }
-			text := strings.TrimSpace(string(data))
-			if text != "" { items = strings.Split(text, "\n") }
+		t, err := readStdinText(int64(maxInputSize))
+		if err != nil {
+			return err
+		}
+		text := strings.TrimSpace(t)
+		if text != "" {
+			items = strings.Split(text, "\n")
 		}
 	}
-	if len(items) == 0 { return fmt.Errorf("no items provided; usage: gloss list <items...>") }
+	if len(items) == 0 {
+		return fmt.Errorf("no items provided; see 'gloss list --help'")
+	}
 
 	result := render.RenderList(items, flagListStyle, flagListStatus)
 	envInfo := env.Detect()

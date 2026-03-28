@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/nalalou/gloss/internal/env"
@@ -14,6 +12,9 @@ import (
 var sparkCmd = &cobra.Command{
 	Use:   "spark <values>",
 	Short: "Render a sparkline",
+	Long: `Renders a Unicode sparkline from numeric values. Values can be passed as
+comma-separated (1,4,7), space-separated arguments, or piped via stdin.
+Each value maps to a bar height character.`,
 	Example: `  gloss spark 1,4,7,3,9,2,5
   gloss spark 1 4 7 3 9 2 5
   echo "1,4,7,3,9" | gloss spark`,
@@ -30,17 +31,14 @@ func runSpark(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		input = strings.Join(args, " ")
 	} else {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, 4096))
-			if err != nil {
-				return fmt.Errorf("read stdin: %w", err)
-			}
-			input = strings.TrimSpace(string(data))
+		t, err := readStdinText(int64(maxInputSize))
+		if err != nil {
+			return err
 		}
+		input = strings.TrimSpace(t)
 	}
 	if input == "" {
-		return fmt.Errorf("no values provided; usage: gloss spark <values>")
+		return fmt.Errorf("no values provided; see 'gloss spark --help'")
 	}
 
 	values, err := render.ParseSparkValues(input)

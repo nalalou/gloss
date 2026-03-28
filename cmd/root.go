@@ -62,7 +62,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
-		return fmt.Errorf("no text provided; run 'gloss --help' for usage")
+		return showShowcase()
 	}
 	if err := validateFlags(); err != nil {
 		return err
@@ -188,6 +188,38 @@ func flagsToOptions() theme.Options {
 	opts.NoColor = flagNoColor
 	opts.Gradient = resolveGradientFlag()
 	return opts
+}
+
+func showShowcase() error {
+	envInfo := env.Detect()
+	noColor := envInfo.NoColor || flagNoColor
+
+	// Render "gloss" banner
+	opts := theme.Defaults()
+	opts.NoColor = noColor
+	opts.Align = "left"
+	if !noColor {
+		opts.Gradient = []string{"#FF6B9D", "#6B9DFF"}
+	}
+	f, err := font.Load("small")
+	if err != nil {
+		f, _ = font.Load("")
+	}
+	if f != nil {
+		banner := render.Render("gloss", f, opts)
+		fmt.Println(banner)
+	}
+
+	fmt.Println("  Terminal styling toolkit — banners, badges, bars, and more.")
+	fmt.Println()
+	fmt.Println("  Try these:")
+	fmt.Println(`    gloss "Hello World" --gradient=fire`)
+	fmt.Println(`    gloss badge "OK" --type=success`)
+	fmt.Println(`    gloss bar 75 --label="Progress"`)
+	fmt.Println(`    gloss divider "Section"`)
+	fmt.Println()
+	fmt.Println("  Run 'gloss --help' for all commands and options.")
+	return nil
 }
 
 func Execute() {

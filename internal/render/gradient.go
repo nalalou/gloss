@@ -54,16 +54,16 @@ func ansiColor(c rgbColor, s string) string {
 var gradientPresets = map[string][]string{
 	"fire":      {"#FF4500", "#FFD700"},
 	"ocean":     {"#006994", "#00CED1"},
-	"mono":      {"#FFFFFF", "#888888"},
+	"mono":      {"#DDDDDD", "#666666"},
 	"neon":      {"#FF6B9D", "#C0F0A0"},
 	"aurora":    {"#00FA9A", "#9370DB"},
 	"sunset":    {"#FF6B35", "#F7931E", "#FF355E"},
 	"synthwave": {"#FF00FF", "#00FFFF", "#FF00FF"},
-	"matrix":    {"#00FF00", "#003300"},
+	"matrix":    {"#00FF00", "#00AA00"},
 	"cyberpunk": {"#FFFF00", "#FF00FF"},
 	"pastel":    {"#FFB3BA", "#BAE1FF"},
 	"lavender":  {"#9B59B6", "#3498DB"},
-	"ice":       {"#FFFFFF", "#00BFFF", "#0000FF"},
+	"ice":       {"#E0F0FF", "#00BFFF", "#0044FF"},
 	"autumn":    {"#8B4513", "#FF8C00", "#FFD700"},
 	"mint":      {"#00FF7F", "#20B2AA"},
 	"rainbow":   {"#FF0000", "#FF8800", "#FFFF00", "#00FF00", "#0088FF", "#8800FF"},
@@ -119,20 +119,64 @@ func ApplyGradient(lines []string, colors []rgbColor, direction string, noColor 
 	}
 
 	for i, line := range lines {
-		runes := []rune(line)
-		n := len(runes)
-		var sb strings.Builder
-		for j, ch := range runes {
-			t := 0.0
-			if n > 1 {
-				t = float64(j) / float64(n-1)
-			}
-			c := interpolateMulti(colors, t)
-			sb.WriteString(ansiColor(c, string(ch)))
-		}
-		result[i] = sb.String()
+		result[i] = applyHorizontalGradient(line, colors, 0.0)
 	}
 	return result
+}
+
+// applyHorizontalGradient colors each visible character individually,
+// skipping over ANSI escape sequences so they pass through unmodified.
+func applyHorizontalGradient(line string, colors []rgbColor, offset float64) string {
+	// First pass: count visible characters.
+	runes := []rune(line)
+	visCount := 0
+	{
+		inEscape := false
+		for _, ch := range runes {
+			if ch == '\033' {
+				inEscape = true
+				continue
+			}
+			if inEscape {
+				if ch == 'm' {
+					inEscape = false
+				}
+				continue
+			}
+			visCount++
+		}
+	}
+	if visCount == 0 {
+		return line
+	}
+
+	// Second pass: emit with gradient colors on visible chars only.
+	var sb strings.Builder
+	inEscape := false
+	visIdx := 0
+	for _, ch := range runes {
+		if ch == '\033' {
+			inEscape = true
+			sb.WriteRune(ch)
+			continue
+		}
+		if inEscape {
+			sb.WriteRune(ch)
+			if ch == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		t := 0.0
+		if visCount > 1 {
+			t = float64(visIdx) / float64(visCount-1)
+		}
+		t = math.Mod(t+offset, 1.0)
+		c := interpolateMulti(colors, t)
+		sb.WriteString(ansiColor(c, string(ch)))
+		visIdx++
+	}
+	return sb.String()
 }
 
 func ApplyGradientWithOffset(lines []string, colors []rgbColor, direction string, offset float64, noColor bool) []string {
@@ -154,19 +198,7 @@ func ApplyGradientWithOffset(lines []string, colors []rgbColor, direction string
 	}
 
 	for i, line := range lines {
-		runes := []rune(line)
-		n := len(runes)
-		var sb strings.Builder
-		for j, ch := range runes {
-			t := 0.0
-			if n > 1 {
-				t = float64(j) / float64(n-1)
-			}
-			t = math.Mod(t+offset, 1.0)
-			c := interpolateMulti(colors, t)
-			sb.WriteString(ansiColor(c, string(ch)))
-		}
-		result[i] = sb.String()
+		result[i] = applyHorizontalGradient(line, colors, offset)
 	}
 	return result
 }

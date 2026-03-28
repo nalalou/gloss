@@ -38,6 +38,71 @@ func init() {
 	rootCmd.AddCommand(rainCmd)
 }
 
+// parseHexRGB parses a "#RRGGBB" string into r, g, b components.
+func parseHexRGB(hex string) (r, g, b uint8, ok bool) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return 0, 0, 0, false
+	}
+	_, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	return r, g, b, err == nil
+}
+
+// rainShades returns a slice of ANSI color strings for the rain trail.
+// If a gradient flag is set, it derives shades from the gradient colors.
+// Otherwise it falls back to the default green shades.
+func rainShades() []string {
+	gradient := resolveGradientFlag()
+	if len(gradient) >= 2 {
+		type rgb struct{ r, g, b uint8 }
+		colors := make([]rgb, 0, len(gradient))
+		for _, h := range gradient {
+			r, g, b, ok := parseHexRGB(h)
+			if ok {
+				colors = append(colors, rgb{r, g, b})
+			}
+		}
+		if len(colors) >= 2 {
+			// White head + 9 shades that dim through the gradient
+			shades := make([]string, 10)
+			shades[0] = "\033[38;2;255;255;255m" // white head
+			for i := 1; i < 10; i++ {
+				t := float64(i-1) / 8.0
+				idx := t * float64(len(colors)-1)
+				lo := int(idx)
+				hi := lo + 1
+				if hi >= len(colors) {
+					hi = len(colors) - 1
+				}
+				frac := idx - float64(lo)
+				cr := float64(colors[lo].r)*(1-frac) + float64(colors[hi].r)*frac
+				cg := float64(colors[lo].g)*(1-frac) + float64(colors[hi].g)*frac
+				cb := float64(colors[lo].b)*(1-frac) + float64(colors[hi].b)*frac
+				dim := 1.0 - float64(i)*0.09
+				if dim < 0.15 {
+					dim = 0.15
+				}
+				shades[i] = fmt.Sprintf("\033[38;2;%d;%d;%dm",
+					int(cr*dim), int(cg*dim), int(cb*dim))
+			}
+			return shades
+		}
+	}
+	// Default green shades — white head like cmatrix, long gradient tail
+	return []string{
+		"\033[38;2;255;255;255m", // white head
+		"\033[38;2;180;255;180m", // near-white green
+		"\033[38;2;0;255;0m",    // bright green
+		"\033[38;2;0;220;0m",
+		"\033[38;2;0;180;0m",
+		"\033[38;2;0;140;0m",
+		"\033[38;2;0;100;0m",
+		"\033[38;2;0;70;0m",
+		"\033[38;2;0;45;0m",
+		"\033[38;2;0;25;0m", // barely visible tail
+	}
+}
+
 func runRain(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -55,8 +120,8 @@ func runRain(cmd *cobra.Command, args []string) error {
 	if lines < 1 {
 		lines = 1
 	}
-	if lines > 30 {
-		lines = 30
+	if lines > 200 {
+		lines = 200
 	}
 
 	// Character set
@@ -80,9 +145,9 @@ func runRain(cmd *cobra.Command, args []string) error {
 	cols := make([]column, width)
 	for i := range cols {
 		cols[i] = column{
-			pos:   -(rng.Intn(lines + 4)), // staggered start
-			speed: 1 + rng.Intn(3),
-			trail: 2 + rng.Intn(4),
+			pos:   -(rng.Intn(lines/2 + 3)),
+			speed: 1 + rng.Intn(2),
+			trail: 4 + rng.Intn(8),
 		}
 	}
 
@@ -95,18 +160,11 @@ func runRain(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Green shades for trail: bright head → dim tail
-	greenShades := []string{
-		"\033[38;2;0;255;0m", // bright green (head)
-		"\033[38;2;0;200;0m",
-		"\033[38;2;0;150;0m",
-		"\033[38;2;0;100;0m",
-		"\033[38;2;0;60;0m", // dark green (tail)
-	}
+	shades := rainShades()
 	reset := "\033[0m"
 
 	if flagNoColor {
-		greenShades = []string{"", "", "", "", ""}
+		shades = []string{"", "", "", "", ""}
 		reset = ""
 	}
 
@@ -120,7 +178,7 @@ func runRain(cmd *cobra.Command, args []string) error {
 
 	duration := time.Duration(flagRainDuration * float64(time.Second))
 	deadline := time.Now().Add(duration)
-	frameDelay := 50 * time.Millisecond
+	frameDelay := 65 * time.Millisecond
 
 	for time.Now().Before(deadline) {
 		select {
@@ -150,9 +208,9 @@ func runRain(cmd *cobra.Command, args []string) error {
 
 				// Reset column when fully off screen
 				if cols[i].pos-cols[i].trail >= lines {
-					cols[i].pos = -(rng.Intn(lines + 6))
-					cols[i].speed = 1 + rng.Intn(3)
-					cols[i].trail = 2 + rng.Intn(4)
+					cols[i].pos = -(rng.Intn(lines/3 + 3))
+					cols[i].speed = 1 + rng.Intn(2)
+					cols[i].trail = 4 + rng.Intn(8)
 				}
 			}
 		}
@@ -174,13 +232,13 @@ func runRain(cmd *cobra.Command, args []string) error {
 					dist = cols[col].pos - row
 				}
 				shadeIdx := dist
-				if shadeIdx >= len(greenShades) {
-					shadeIdx = len(greenShades) - 1
+				if shadeIdx >= len(shades) {
+					shadeIdx = len(shades) - 1
 				}
 
-				sb.WriteString(greenShades[shadeIdx])
+				sb.WriteString(shades[shadeIdx])
 				sb.WriteRune(ch)
-				if greenShades[shadeIdx] != "" {
+				if shades[shadeIdx] != "" {
 					sb.WriteString(reset)
 				}
 			}

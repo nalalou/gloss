@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/nalalou/gloss/internal/env"
 	"github.com/nalalou/gloss/internal/render"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var (
@@ -20,6 +20,9 @@ var (
 var colorCmd = &cobra.Command{
 	Use:   "color <text>",
 	Short: "Style text with colors, bold, or dim",
+	Long: `Applies ANSI color and style to text for inline use in scripts. Outputs
+without a trailing newline when piped, so it composes inside echo/printf.
+When stdout is a terminal, a newline is appended for readability.`,
 	Example: `  gloss color "FAILED" --fg=red
   gloss color "OK" --fg=green --bold
   gloss color "note" --dim
@@ -41,24 +44,26 @@ func runColor(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		text = args[0]
 	} else {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, int64(maxInputSize)))
-			if err != nil {
-				return fmt.Errorf("read stdin: %w", err)
-			}
-			text = strings.TrimRight(string(data), "\n")
+		t, err := readStdinText(int64(maxInputSize))
+		if err != nil {
+			return err
 		}
+		text = strings.TrimRight(t, "\n")
 	}
 	if text == "" {
-		return fmt.Errorf("no text provided; usage: gloss color <text> --fg=red")
+		return fmt.Errorf("no text provided; see 'gloss color --help'")
 	}
 
 	envInfo := env.Detect()
 	noColor := envInfo.NoColor || flagNoColor
 
+	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+
 	if noColor {
 		fmt.Print(text)
+		if isTTY {
+			fmt.Println()
+		}
 		return nil
 	}
 
@@ -74,7 +79,11 @@ func runColor(cmd *cobra.Command, args []string) error {
 
 	result := render.RenderStyled(text, fg, flagColorBold, flagColorDim)
 
-	// Print WITHOUT newline — this enables inline use: echo "$(gloss color OK --fg=green)"
+	// Print WITHOUT newline when piped (enables inline use).
+	// Append newline when stdout is a terminal for readability.
 	fmt.Print(result)
+	if isTTY {
+		fmt.Println()
+	}
 	return nil
 }
