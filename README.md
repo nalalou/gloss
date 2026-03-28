@@ -9,7 +9,7 @@
 
 **GitHub Actions** **`::`** **annotations, but for your terminal.**
 
-One binary. One pipe. Any language. Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels. Zero dependencies in your code, just `echo`.
+Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels — one binary you pipe through. Zero dependencies in your code, just `echo`.
 
 ```bash
 brew install gloss  # coming soon
@@ -34,7 +34,7 @@ echo "::ok All green"
 ./my-script.sh | gloss watch
 ```
 
-The `::` lines become live-updating widgets. Everything else scrolls normally. No SDK. No import. Works from Bash, Python, Go, Rust, TypeScript — anything that can `print`.
+The `::` lines become live-updating widgets. Everything else scrolls normally. Works from Bash, Python, Go, Rust, TypeScript — anything that can `print`.
 
 ***
 
@@ -52,7 +52,7 @@ PASS api_test.go (8 tests)
   ████████████████████████████░░░░░░░░░░░ 66%
 ```
 
-The bottom panel stays in place and updates live. The top scrolls. That's it.
+The bottom panel stays in place and updates live. The top scrolls.
 
 ***
 
@@ -197,9 +197,7 @@ fmt.Println("::bar 100 Coverage")
 
 The user runs: `my-agent | gloss watch`
 
-That's the entire integration story.
-
-***
+---
 
 ## Config
 
