@@ -7,16 +7,16 @@
 /____/
 ```
 
-**GitHub Actions `::` annotations, but for your terminal.**
+**GitHub Actions** **`::`** **annotations, but for your terminal.**
 
-One binary. One pipe. Any language. Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels. Zero dependencies in your code — just `echo`.
+One binary. One pipe. Any language. Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels. Zero dependencies in your code, just `echo`.
 
 ```bash
 brew install gloss  # coming soon
 go install github.com/nalalou/gloss@latest
 ```
 
----
+***
 
 ## The Idea
 
@@ -36,7 +36,7 @@ echo "::ok All green"
 
 The `::` lines become live-updating widgets. Everything else scrolls normally. No SDK. No import. Works from Bash, Python, Go, Rust, TypeScript — anything that can `print`.
 
----
+***
 
 ## What It Looks Like
 
@@ -54,7 +54,7 @@ PASS api_test.go (8 tests)
 
 The bottom panel stays in place and updates live. The top scrolls. That's it.
 
----
+***
 
 ## The Protocol
 
@@ -81,9 +81,9 @@ Add `id=` to make it **live-updating** (tracked in the panel):
 ::kv id=meta Pods=3/3 | Region=us-1   updates in place
 ```
 
-**No `id=`** → scrolls once. **With `id=`** → persists in panel, updates in place.
+**No** **`id=`** → scrolls once. **With** **`id=`** → persists in panel, updates in place.
 
----
+***
 
 ## Two Modes
 
@@ -103,7 +103,7 @@ Splits terminal into scroll zone + persistent panel. `id=` directives update in 
 my-agent | gloss watch
 ```
 
----
+***
 
 ## All the Primitives
 
@@ -146,7 +146,7 @@ gloss spin "Installing..." -- npm install      # ⠹ Installing... → ✓
 gloss "Hello World" --font=doom --gradient=fire
 ```
 
----
+***
 
 ## 12 Fonts
 
@@ -166,7 +166,7 @@ Custom gradients with 2+ hex colors:
 gloss "RGB" --gradient="#FF0000,#00FF00,#0000FF"
 ```
 
----
+***
 
 ## For AI Agent Builders
 
@@ -199,7 +199,7 @@ The user runs: `my-agent | gloss watch`
 
 That's the entire integration story.
 
----
+***
 
 ## Config
 
@@ -219,7 +219,7 @@ border = "rounded"
 
 Flags override config. `NO_COLOR` and `TERM=dumb` are respected. Color auto-disables when piped.
 
----
+***
 
 ## Install
 
@@ -234,7 +234,7 @@ cd gloss && go build -o gloss .
 
 Homebrew tap coming with first tagged release.
 
----
+***
 
 ## The Taste Line
 
@@ -242,7 +242,7 @@ Homebrew tap coming with first tagged release.
 
 If you're formatting more than 10% of your output, you've crossed the line.
 
----
+***
 
 ## License
 
