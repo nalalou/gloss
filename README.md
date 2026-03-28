@@ -9,7 +9,7 @@
 
 **GitHub Actions** **`::`** **annotations, but for your terminal.**
 
-Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels — one binary you pipe through. Zero dependencies in your code, just `echo`.
+Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels in one binary you pipe through. Zero dependencies in your code, just `echo`.
 
 ```bash
 brew install gloss  # coming soon
@@ -20,7 +20,7 @@ go install github.com/nalalou/gloss@latest
 
 ## The Idea
 
-AI agents and build scripts produce walls of text. Gloss adds structure — not by importing a library, but by piping through a formatter.
+AI agents and build scripts produce walls of text. Gloss adds structure by piping through a formatter.
 
 ```bash
 # Your agent/script just prints lines:
@@ -197,7 +197,7 @@ fmt.Println("::bar 100 Coverage")
 
 The user runs: `my-agent | gloss watch`
 
----
+***
 
 ## Config
 
