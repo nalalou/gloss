@@ -170,7 +170,7 @@ gloss "RGB" --gradient="#FF0000,#00FF00,#0000FF"
 
 ## For AI Agent Builders
 
-Gloss was designed for agents. The `::` protocol is what GitHub Actions uses for `::warning`, `::group`, `::error` — but portable to any terminal.
+Gloss was designed for agents. The `::` protocol is what GitHub Actions uses for `::warning`, `::group`, `::error`, but portable to any terminal.
 
 An agent just prints lines. It doesn't import a library. It doesn't adopt a framework. It just `echo`s.
 
