@@ -248,4 +248,4 @@ MIT
 
 ## Acknowledgments
 
-Built with [Lip Gloss](https://github.com/charmbracelet/lipgloss) and inspired by the [Charmbracelet](https://charm.sh) ecosystem.
+README.md polished in [ginsberg.ai](ginsberg.ai). Built with [Lip Gloss](https://github.com/charmbracelet/lipgloss) and inspired by the [Charmbracelet](https://charm.sh) ecosystem.
