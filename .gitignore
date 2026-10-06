@@ -1,4 +1,5 @@
 gloss
 dist/
 gloss.toml
+gloss-debug
 docs/

@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -11,18 +10,16 @@ import (
 )
 
 func RenderLine(line string, width int, noColor bool) string {
-	if !strings.HasPrefix(line, "::") {
-		return line
+	if name, params, message, ok := ParseGitHub(line); ok {
+		if width == 0 {
+			width = termWidth()
+		}
+		return renderGitHub(name, params, message, width, noColor)
 	}
-	rest := strings.TrimPrefix(line, "::")
-	if rest == "" {
+	// The id= tag only matters to gloss watch; formatting ignores it.
+	directive, _, args := ParseDirective(line)
+	if directive == "" {
 		return line
-	}
-	parts := strings.SplitN(rest, " ", 2)
-	directive := strings.ToLower(parts[0])
-	args := ""
-	if len(parts) > 1 {
-		args = parts[1]
 	}
 
 	switch directive {
@@ -37,6 +34,9 @@ func RenderLine(line string, width int, noColor bool) string {
 	case "bar":
 		return fmtBar(args, width)
 	case "divider", "div":
+		if width == 0 {
+			width = termWidth()
+		}
 		return render.RenderDivider(args, width, "light")
 	case "callout":
 		return fmtCallout(args)
@@ -237,6 +237,11 @@ func fmtStatus(args string, noColor bool) string {
 
 	var icon string
 	switch state {
+	case "fail", "failed":
+		state = "error"
+	}
+
+	switch state {
 	case "done":
 		icon = "✓"
 	case "error":
@@ -265,6 +270,3 @@ func fmtStatus(args string, noColor bool) string {
 		return result
 	}
 }
-
-// Needed so render package functions used here are importable
-var _ = fmt.Sprintf
