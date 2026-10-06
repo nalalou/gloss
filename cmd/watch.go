@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
@@ -60,11 +59,12 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	defer renderer.ShowCursor()
 
 	lines := make(chan string, 256)
+	readErr := make(chan error, 1)
 	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			lines <- scanner.Text()
-		}
+		var masker protocol.Masker
+		readErr <- protocol.ReadLines(os.Stdin, func(line string) {
+			lines <- masker.Apply(line)
+		})
 		close(lines)
 	}()
 
@@ -103,6 +103,9 @@ func runWatch(cmd *cobra.Command, args []string) error {
 					panel.Set(id, dir, dargs, noColor)
 				} else {
 					rendered := protocol.RenderLine(bline, width, noColor)
+					if rendered == "" && bline != "" {
+						continue // hidden directive, e.g. ::endgroup::
+					}
 					for _, subline := range strings.Split(rendered, "\n") {
 						scrollLines = append(scrollLines, subline)
 					}
@@ -139,21 +142,18 @@ cleanup:
 	for _, line := range summaryLines {
 		fmt.Println(line)
 	}
-	return nil
+	select {
+	case err := <-readErr:
+		return err
+	default: // interrupted before input ended
+		return nil
+	}
 }
 
 func runWatchStateless(noColor bool) error {
-	width := 80
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		line := scanner.Text()
-		dir, _, args := protocol.ParseDirective(line)
-		if dir != "" {
-			rendered := protocol.RenderLine("::"+dir+" "+args, width, noColor)
-			fmt.Println(rendered)
-		} else {
-			fmt.Println(line)
-		}
+	width := flagWidth
+	if width == 0 {
+		width = 80
 	}
-	return scanner.Err()
+	return formatStream(width, noColor)
 }

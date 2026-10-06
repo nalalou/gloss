@@ -83,6 +83,17 @@ Add `id=` to make it **live-updating** (tracked in the panel):
 
 **No** **`id=`** → scrolls once. **With** **`id=`** → persists in panel, updates in place.
 
+GitHub Actions workflow commands work too, so existing CI scripts look right locally:
+
+```
+::error file=app.go,line=12::Nil map    ✗ app.go:12 Nil map
+::warning::Deprecated flag              ⚠ Deprecated flag
+::notice::Using cache                   ℹ Using cache
+::group::Build                          ──────── Build ────────
+::endgroup::                            (hidden)
+::add-mask::$TOKEN                      hides $TOKEN as *** from then on
+```
+
 ***
 
 ## Two Modes
