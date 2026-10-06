@@ -96,7 +96,25 @@ GitHub Actions workflow commands work too, so existing CI scripts look right loc
 
 ***
 
-## Two Modes
+## Three Ways to Run It
+
+### `gloss run` — run a command inside gloss
+
+Starts the command for you and shows its output in the live panel, error output included. Steps show how long they took, the panel ends with a pass/fail line, and gloss exits with the command's own exit code, so it works in scripts and CI.
+
+```bash
+gloss run npm test
+gloss run -- ./deploy.sh --env=prod
+```
+
+```
+───────────────────────────── gloss ─────────────────────────────
+  ✗ deploy.sh --env=prod (exit 1) 48s
+  ✓ Build 12s
+  ✗ Migrate 31s
+```
+
+The command sees `GLOSS=1`, plus `FORCE_COLOR=1` when gloss is drawing to a terminal, so tools keep their colors. Ctrl+C stops the command and still shows the summary; press it twice to force-kill.
 
 ### `gloss fmt` — stateless pipe formatter
 
@@ -108,7 +126,7 @@ my-script.sh | gloss fmt
 
 ### `gloss watch` — live TUI panel
 
-Splits terminal into scroll zone + persistent panel. `id=` directives update in place. Spinners animate. Falls back to `gloss fmt` when piped.
+Splits terminal into scroll zone + persistent panel. `id=` directives update in place. Spinners animate, and finished steps show how long they took. Falls back to `gloss fmt` when piped.
 
 ```bash
 my-agent | gloss watch
@@ -206,7 +224,7 @@ fmt.Println("::ok Build passed")
 fmt.Println("::bar 100 Coverage")
 ```
 
-The user runs: `my-agent | gloss watch`
+The user runs: `gloss run my-agent` (or `my-agent | gloss watch`)
 
 ***
 

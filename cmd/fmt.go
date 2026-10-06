@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"bufio"
-	"fmt"
 	"os"
-	"strings"
 
 	"github.com/nalalou/gloss/internal/env"
-	"github.com/nalalou/gloss/internal/protocol"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -53,23 +49,7 @@ func runFmt(cmd *cobra.Command, args []string) error {
 		width = w
 	}
 
-	return formatStream(width, noColor)
-}
-
-// formatStream renders stdin line by line, without cursor tricks.
-func formatStream(width int, noColor bool) error {
-	out := bufio.NewWriter(os.Stdout)
-	defer out.Flush()
-	var masker protocol.Masker
-	return protocol.ReadLines(os.Stdin, func(line string) {
-		line = masker.Apply(line)
-		rendered := protocol.RenderLine(line, width, noColor)
-		if rendered == "" && line != "" {
-			return // hidden directive, e.g. ::endgroup:: or ::remove
-		}
-		fmt.Fprintln(out, rendered)
-		if !strings.HasPrefix(line, "::") {
-			out.Flush() // keep plain output live; batch only directive bursts
-		}
-	})
+	lines, readErr := readInput(os.Stdin)
+	formatLines(lines, width, noColor)
+	return <-readErr
 }
