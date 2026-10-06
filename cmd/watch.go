@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -35,10 +37,64 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	envInfo := env.Detect()
 	noColor := envInfo.NoColor || flagNoColor
 
-	if !envInfo.IsTTY {
-		return runWatchStateless(noColor)
+	lines, readErr := readInput(os.Stdin)
+	if envInfo.IsTTY {
+		livePanel(lines, noColor, true)
+	} else {
+		formatLines(lines, plainWidth(), noColor)
 	}
 
+	select {
+	case err := <-readErr:
+		return err
+	default: // interrupted before input ended
+		return nil
+	}
+}
+
+// readInput streams r's lines, with ::add-mask:: secrets hidden, on the returned
+// channel. The error channel receives ReadLines' result just before lines closes.
+func readInput(r io.Reader) (<-chan string, <-chan error) {
+	lines := make(chan string, 256)
+	readErr := make(chan error, 1)
+	go func() {
+		var masker protocol.Masker
+		readErr <- protocol.ReadLines(r, func(line string) {
+			lines <- masker.Apply(line)
+		})
+		close(lines)
+	}()
+	return lines, readErr
+}
+
+// plainWidth is the width for non-TTY output: --width, else 80.
+func plainWidth() int {
+	if flagWidth > 0 {
+		return flagWidth
+	}
+	return 80
+}
+
+// formatLines renders each line as styled text, without cursor tricks.
+func formatLines(lines <-chan string, width int, noColor bool) {
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	for line := range lines {
+		rendered := protocol.RenderLine(line, width, noColor)
+		if rendered == "" && line != "" {
+			continue // hidden directive, e.g. ::endgroup:: or ::remove
+		}
+		fmt.Fprintln(out, rendered)
+		if len(lines) == 0 {
+			out.Flush() // nothing queued, so show what we have
+		}
+	}
+}
+
+// livePanel scrolls plain lines and keeps id= directives in a panel at the
+// bottom of the terminal until lines closes. If stopOnInterrupt is true,
+// Ctrl+C ends it early; otherwise the caller handles interrupts.
+func livePanel(lines <-chan string, noColor bool, stopOnInterrupt bool) {
 	width := flagWidth
 	if width == 0 {
 		w, _, err := term.GetSize(int(os.Stdout.Fd()))
@@ -49,7 +105,10 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	}
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGWINCH)
+	signal.Notify(sigCh, syscall.SIGWINCH)
+	if stopOnInterrupt {
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	}
 	defer signal.Stop(sigCh)
 
 	panel := watch.NewPanel(width)
@@ -57,16 +116,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 	renderer.HideCursor()
 	defer renderer.ShowCursor()
-
-	lines := make(chan string, 256)
-	readErr := make(chan error, 1)
-	go func() {
-		var masker protocol.Masker
-		readErr <- protocol.ReadLines(os.Stdin, func(line string) {
-			lines <- masker.Apply(line)
-		})
-		close(lines)
-	}()
 
 	spinnerTicker := time.NewTicker(80 * time.Millisecond)
 	defer spinnerTicker.Stop()
@@ -106,9 +155,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 					if rendered == "" && bline != "" {
 						continue // hidden directive, e.g. ::endgroup::
 					}
-					for _, subline := range strings.Split(rendered, "\n") {
-						scrollLines = append(scrollLines, subline)
-					}
+					scrollLines = append(scrollLines, strings.Split(rendered, "\n")...)
 				}
 			}
 
@@ -138,22 +185,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 cleanup:
 	renderer.ClearPanel()
-	summaryLines := panel.RenderLines()
-	for _, line := range summaryLines {
+	for _, line := range panel.RenderLines() {
 		fmt.Println(line)
 	}
-	select {
-	case err := <-readErr:
-		return err
-	default: // interrupted before input ended
-		return nil
-	}
-}
-
-func runWatchStateless(noColor bool) error {
-	width := flagWidth
-	if width == 0 {
-		width = 80
-	}
-	return formatStream(width, noColor)
 }

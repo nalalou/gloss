@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -224,6 +225,10 @@ func showShowcase() error {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		var exit exitCodeError
+		if errors.As(err, &exit) {
+			os.Exit(exit.code)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
