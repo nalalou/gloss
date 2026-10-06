@@ -12,8 +12,8 @@
 Your scripts emit `::` directives. Gloss renders them as progress bars, badges, tables, sparklines, and live-updating panels in one binary you pipe through. Zero dependencies in your code, just `echo`.
 
 ```bash
-brew install gloss  # coming soon
 go install github.com/nalalou/gloss@latest
+# or grab a binary from https://github.com/nalalou/gloss/releases
 ```
 
 ***
@@ -254,12 +254,15 @@ Flags override config. `NO_COLOR` and `TERM=dumb` are respected. Color auto-disa
 # Go
 go install github.com/nalalou/gloss@latest
 
+# Prebuilt binaries (macOS and Linux, Intel and ARM)
+# https://github.com/nalalou/gloss/releases
+
 # From source
 git clone https://github.com/nalalou/gloss.git
 cd gloss && go build -o gloss .
 ```
 
-Homebrew tap coming with first tagged release.
+Homebrew is coming soon.
 
 ***
 

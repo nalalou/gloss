@@ -17,28 +17,29 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X github.com/nalalou/gloss/cmd.version={{.Version}}
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
 
 checksum:
   name_template: "checksums.txt"
 
-brews:
+homebrew_casks:
   - name: gloss
     homepage: "https://github.com/nalalou/gloss"
-    description: "Render beautiful styled text banners in your terminal"
+    description: "Render :: directives as live progress panels, badges, and tables in your terminal"
     license: "MIT"
     repository:
       owner: nalalou
       name: homebrew-gloss
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    test: |
-      system "#{bin}/gloss --help"
-    install: |
-      bin.install "gloss"
+    # Publish the GitHub release even before the Homebrew tap is set up.
+    skip_upload: '{{ if eq .Env.HOMEBREW_TAP_TOKEN "" }}true{{ end }}'
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/gloss"]
+          end
